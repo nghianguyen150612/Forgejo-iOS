@@ -590,12 +590,132 @@ changing Forgejo production packages.
   unresolved device execution blocker, not evidence of a Forgejo source
   failure.
 
-## Prompt 003 recommendation
+## Prompt 003 runtime compatibility result
 
-Use the proven macOS/Xcode wrapper to compile the smallest Forgejo package
-matrix and then the root executable with the intended `bindata timetzdata`
-and SQLite tags, without broad compatibility patches. Capture the first real
-Forgejo compiler/linker errors and separately investigate why this otherwise
-valid Go CGO arm64/iPhoneOS probe is killed on iOS 12.5.7. Do not begin Git
-rewrites, SQLite design changes, or optional feature work until the device
-launch/signing/runtime blocker is isolated.
+Prompt 003 remained diagnosis-only. It did not modify Forgejo production
+packages, `go.mod`, `go.sum`, or the existing Prompt 002 compiler wrapper and
+CGO build script. The workflow now builds one native C control and the
+smallest pure-Go/CGO version matrix, but it preserves the original
+Prompt 002 Go 1.26.7 CGO command as a regression check.
+
+### Build evidence
+
+The final matrix artifact records the exact Git commit and toolchain in
+`build-info.txt`. The successful build environment was:
+
+- GitHub Actions `macos-15`, runner architecture `arm64`.
+- macOS `15.7.9`, Xcode `16.4` build `16F6`, iPhoneOS SDK `18.5`.
+- Apple clang `17.0.0` (`clang-1700.0.13.5`).
+- `GOOS=ios`, `GOARCH=arm64`, `CGO_ENABLED=1`, deployment target `12.0`.
+- Go `1.20.14 darwin/arm64` and Go `1.26.7 darwin/arm64`, both obtained with
+  the official `actions/setup-go` action. Go 1.20.14 was built in module-off
+  file mode so the standalone probe did not inherit Forgejo's `go 1.26.0`
+  module requirement.
+
+Every successful executable was inspected with `file`, `otool -hv`,
+`otool -l`, and `otool -L`. Each is a thin `Mach-O 64-bit arm64` executable
+with `LC_BUILD_VERSION` physical iOS platform `2`, minimum iOS `12.0`, and
+SDK `18.5`. No simulator, macOS, x86_64, Homebrew, or other host dynamic
+library dependency was present. The native C probe links only
+`/usr/lib/libSystem.B.dylib`; the Go probes link the expected system
+libraries (`libSystem`, `libresolv`, and, where emitted by the Go external
+link, CoreFoundation).
+
+The CI signing treatment was `codesign --force --sign - --timestamp=none`.
+The resulting signatures were ad hoc, with `VersionPlatform=2`,
+`VersionMin=786432` (iOS 12.0), no team identifier, and no provisioning
+profile. The artifact contained only the five probes, `SHA256SUMS`, and
+`build-info.txt`:
+
+| Probe | Build result | Size | SHA-256 |
+| --- | --- | ---: | --- |
+| `native-c-probe` | Apple clang native C: PASS | 68,112 bytes | `b53936f97cde0a332cd5f185bce8cc3489d90238f445d501229de8a6531c39e8` |
+| `go120-probe` | Go 1.20.14 pure Go: PASS | 1,471,504 bytes | `b9cb2115575ed5ced0674fe1054218a145aa277702a5e137b551c774eb1ee864` |
+| `go120-cgo-probe` | Go 1.20.14 CGO: PASS | 1,471,904 bytes | `e94d1e0bf4bd5ff818678952a6d0b398f2fb333fc1bfdb37e1b3988918496440` |
+| `go126-probe` | Go 1.26.7 pure Go: PASS | 1,768,688 bytes | `01e87196666f84b96a10edf8f68c4ac8f9e8b195dc2fbef4ee5e0bb6ddbf617b` |
+| `go126-cgo-probe` | Go 1.26.7 CGO and Prompt 002 path: PASS | 1,769,008 bytes | `a17286a05ad07edf96f834a12201779a70702a1849ea122c59ddacd8b0a2c72f` |
+
+The only build warning was the Go 1.20.14 external linker's
+`-ld_classic` deprecation warning from Xcode 16.4; it did not prevent either
+Go 1.20.14 executable from being produced. The device-side `sha256sum -c
+SHA256SUMS` check passed for all five transferred artifacts before execution.
+
+### Real-device execution evidence
+
+The target was the configured iPad mini 2 (`iPad4,4`, Apple A7, arm64),
+iOS/iPadOS `12.5.7`, Darwin `18.7.0`. The probes were transferred to a
+dedicated P3 directory without replacing the Prompt 002 artifacts. The
+original CI ad-hoc copies were run first, in this order: native C, Go 1.20.14
+pure Go, Go 1.20.14 CGO, Go 1.26.7 pure Go, and Go 1.26.7 CGO.
+
+All five original CI ad-hoc copies had the same result:
+
+- stdout: `0` bytes;
+- stderr: `10` bytes, exactly `Killed: 9`;
+- exit code: `137`.
+
+This was not a Go-only result. The native C control died before printing
+`forgejo-ios native C probe` or `C_RUNTIME=ok`. Both Go 1.20.14 probes and
+both Go 1.26.7 probes likewise produced no startup marker, including the
+runtime version/GOOS/GOARCH lines in the pure-Go probes.
+
+The separately named `/usr/bin/ldid` copies were then tested without
+mutating the checksum-controlled originals. Default `ldid -S` completed with
+exit `0` and empty stdout/stderr for every copy; every resulting executable
+still exited `137` with empty stdout and `Killed: 9` on stderr. As a signing
+diagnostic, explicit `ldid -S -Cadhoc` copies were also tested. They reported
+CodeDirectory flags `0x2(adhoc)` and also all exited `137`. The explicit ldid
+retry therefore did not turn the matrix into a Go-version distinction.
+
+Two lower-layer controls were useful:
+
+- `/private/var` was mounted without `noexec`; the P3 directory itself was
+  not an execution-disabled filesystem.
+- The device's existing Apple-signed `/usr/bin/true` ran directly and also
+  ran after copying it into the P3 directory. A copy of that same system
+  binary re-signed with `ldid` was killed with `137`, just like the probes.
+  This supports a device code-signing/AMFI enforcement explanation for the
+  user-built files, but does not by itself identify the exact required
+  entitlement or signature form.
+
+The available device user could not read the kernel buffer (`dmesg` reported
+`Operation not permitted`), and no readable system log or `otool`/`codesign`
+diagnostic was available on the iPad. Therefore the exact subreason within
+device signing enforcement, dyld rejection, or another jailbreak execution
+policy is not claimed as proven.
+
+### Classification
+
+- **Proven fact:** Apple clang produced a valid physical-iOS arm64 Mach-O
+  native C executable with minimum iOS 12.0, and both official Go versions
+  produced valid equivalent pure-Go and CGO Mach-O executables. All five
+  failed identically before application output on the real device.
+- **Strong inference:** the Prompt 002 launch blocker is below the Go runtime
+  layer and is shared by any user-built executable under the current device
+  signing/execution policy. The native C failure rules out Go 1.26.7 as the
+  explanation for the observed `SIGKILL`.
+- **Untested hypothesis:** the device may require a particular jailbreak
+  signing path, entitlement set, or older-compatible Mach-O/signature shape;
+  the available unprivileged diagnostics cannot distinguish those causes.
+
+The current evidence does **not** support classifying Go 1.26.7 as the iOS
+12.5.7 runtime compatibility boundary. Go 1.20.14 is build-compatible with
+the Xcode 16.4/iPhoneOS 18.5 toolchain, but its real-device runtime behavior
+is presently masked by the same lower-layer failure as Go 1.26.7. No Go
+runtime patch or Forgejo compatibility backport should be selected from this
+matrix alone.
+
+## Prompt 004 recommendation
+
+First establish a device-accepted signing/execution path with the native C
+control, using a known-working jailbreak signing procedure or privileged
+AMFI/kernel diagnostics. In parallel, compare the complete Mach-O load
+commands against a device-native executable and, if necessary, obtain a
+supported older Apple toolchain/SDK diagnostic without downloading an
+unofficial SDK. Repeat the same five-probe matrix only after native C runs;
+then the Go 1.20.14-versus-1.26.7 runtime boundary can be evaluated directly.
+
+Do not backport Forgejo to Go 1.20.14, patch the Go runtime, change Forgejo's
+module requirements, or compile Forgejo production packages until that lower
+device execution blocker is resolved. This is a device/toolchain/signing
+investigation, not yet evidence for strategy A or B.
