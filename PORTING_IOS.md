@@ -302,8 +302,9 @@ The eventual toolchain must provide, at minimum:
 5. reproducible CFLAGS/LDFLAGS for the chosen SQLite strategy; and
 6. a way to transfer and launch the resulting device executable for a probe.
 
-This is the first hard dependency for Prompt 002. The exact flags must come
-from the installed SDK/toolchain rather than being guessed in the repository.
+This was the first hard dependency for Prompt 002. Prompt 002 now proves the
+toolchain path in GitHub Actions; the exact flags come from the active Xcode
+SDK rather than from a version-specific absolute Xcode path in the repository.
 
 ### G. SQLite
 
@@ -492,9 +493,10 @@ cross-compile probe:
 The audit yields this implementation sequence. It is an order of dependency,
 not permission to implement all items in Prompt 002.
 
-1. **Toolchain proof:** establish or obtain the reproducible arm64 iPhoneOS
-   C/SDK/linker environment and compile a minimal CGO Go iOS executable.
-2. **Small source compile matrix:** compile affected generic Unix packages and
+1. **Toolchain proof (completed in Prompt 002):** establish or obtain the
+   reproducible arm64 iPhoneOS C/SDK/linker environment and compile a minimal
+   CGO Go iOS executable. The device execution gate remains a blocker below.
+2. **Small source compile matrix (Prompt 003):** compile affected generic Unix packages and
    the root Forgejo executable with the selected tags; fix only confirmed
    compiler/API failures, preserving upstream code where possible.
 3. **SQLite device proof:** build the default bundled `go-sqlite3` path, then
@@ -520,18 +522,80 @@ not permission to implement all items in Prompt 002.
   claim about a Forgejo binary is made.
 - No broad source compatibility patch, SQLite fork, Git rewrite, or optional
   subsystem removal was attempted.
-- The exact iPhoneOS SDK version, minimum deployment flag spelling, Mach-O
-  linker choice, and SQLite CFLAGS/LDFLAGS remain unresolved until the actual
-  build environment is supplied.
+- The Prompt 002 CI environment resolved the iPhoneOS SDK version, deployment
+  flag spelling, Mach-O load-command validation, and Apple linker path for the
+  minimal probe. SQLite CFLAGS/LDFLAGS remain unresolved until the Forgejo
+  SQLite build is attempted with the same toolchain.
 - Device behavior must be recorded separately from source findings; a
   Darwin-compatible file is not considered iOS-compatible without compile and
   real-device evidence.
 
-## Prompt 002 recommendation
+## Prompt 002 toolchain result
 
-Prompt 002 should be narrowly scoped to the first dependency in the list:
-produce a reproducible minimal `GOOS=ios GOARCH=arm64 CGO_ENABLED=1` toolchain
-probe and, if that probe succeeds, compile the smallest Forgejo package/root
-set needed to expose confirmed compiler and linker errors. It should not begin
-Git rewrites, broad `_ios.go` abstractions, SQLite design changes, or optional
-feature work until the toolchain and first source errors are demonstrated.
+Prompt 002 established the build infrastructure and minimal CGO probe without
+changing Forgejo production packages.
+
+- Strategy: GitHub Actions on the standard `macos-15` runner, using the active
+  Xcode installation through `xcrun --sdk iphoneos`; no Apple SDK or Xcode
+  files are committed. The observed runner label resolved to `macos-15-arm64`.
+- CI run: `35430530376`, successful job `105864153811` for the final
+  pre-device-validation workflow state. The uploaded build metadata records
+  the exact Git commit used for that artifact.
+- Toolchain: macOS `15.7.9` build `24G830`, Xcode `16.4` build `16F6`,
+  iPhoneOS SDK `18.5`, Apple clang `17.0.0`
+  (`clang-1700.0.13.5`), and Go `go1.26.7 darwin/arm64`.
+- Target: `GOOS=ios`, `GOARCH=arm64`, `CGO_ENABLED=1`, physical-device
+  target `arm64-apple-ios12.0`, with deployment target `12.0`. This is
+  compatible with the initial iOS `12.5.7` device target.
+- Compiler wrapper: `scripts/ios/clang-wrapper` resolves the SDK and clang
+  from `xcrun`, rejects simulator/macOS arguments, and supplies `-arch arm64`,
+  `-target arm64-apple-ios12.0`, the active iPhoneOS `-isysroot`, and
+  `-mios-version-min=12.0`. It fails clearly outside an active Xcode
+  environment.
+- Probe command: `scripts/ios/build-cgo-probe.sh build/ios/ios-cgo-probe`,
+  which invokes `go build -mod=readonly -trimpath -buildvcs=false
+  -buildmode=exe -ldflags=-linkmode=external` for
+  `./tools/ios-cgo-probe`. The probe uses `import "C"` and a deterministic C
+  function returning `42`.
+- Mach-O inspection: `file` reported `Mach-O 64-bit arm64 executable` and
+  `otool -hv` reported `MH_MAGIC_64`, `ARM64`, and `EXECUTE`. `LC_BUILD_VERSION`
+  reported physical iOS platform enum `2`, `minos 12.0`, and SDK `18.5`.
+  The workflow accepts the symbolic `IOS` spelling used by older tools and
+  numeric platform `2` used by this Xcode, while rejecting simulator platform
+  `7`.
+- Linked libraries: `/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation`,
+  `/usr/lib/libresolv.9.dylib`, and `/usr/lib/libSystem.B.dylib`. No
+  Homebrew or macOS-only dynamic dependency was found.
+- Signing: CI used `codesign --force --sign - --timestamp=none`, producing an
+  ad-hoc signature with `VersionPlatform=2`, `VersionMin=786432` (12.0), and
+  no team identifier or provisioning profile.
+- Artifact: the uploaded `ios-cgo-probe` was retrieved on Linux, identified as
+  Mach-O arm64, and passed `sha256sum -c SHA256SUMS`. The executable was
+  `1769008` bytes with SHA-256
+  `ca05ccb276f61706403e02c6423ceae29bbecf7ccb2eeab84d0e603243eb801a`.
+- Initial CI failure: the first run reached and built the valid Mach-O but
+  failed only because the validator expected the textual platform name
+  `IOS`; the final workflow corrected this to recognize Xcode's numeric
+  platform enum without loosening the physical-device check.
+- Device preflight: the configured Tailscale peer `ipad-server` was verified
+  as iOS `12.5.7` build `16H81`, `iPad4,4`, arm64, with user `nghianguyen`.
+  The transferred artifact's checksum matched on the device at
+  `/var/nghianguyen/forgejo-ios-p2-preflight-b14ea0835a95288df4cfdc5cab149d1bb0570381`.
+  Direct execution produced empty stdout/stderr and exit `137` (SIGKILL).
+  The existing `/usr/bin/ldid` was detected; the minimum retry was applied to
+  a copy, changing its SHA-256 to
+  `f6d523e7c853ef0751bbb2cc444d183882511cd0b01e5cbff95ae7deca3fe009`, but
+  that copy also produced empty stdout/stderr and exit `137`. No device-side
+  diagnostic message was available to the configured user. This is an
+  unresolved device execution blocker, not evidence of a Forgejo source
+  failure.
+
+## Prompt 003 recommendation
+
+Use the proven macOS/Xcode wrapper to compile the smallest Forgejo package
+matrix and then the root executable with the intended `bindata timetzdata`
+and SQLite tags, without broad compatibility patches. Capture the first real
+Forgejo compiler/linker errors and separately investigate why this otherwise
+valid Go CGO arm64/iPhoneOS probe is killed on iOS 12.5.7. Do not begin Git
+rewrites, SQLite design changes, or optional feature work until the device
+launch/signing/runtime blocker is isolated.

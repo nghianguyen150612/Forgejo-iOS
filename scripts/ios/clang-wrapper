@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+fail() {
+	printf 'ios clang wrapper: %s\n' "$*" >&2
+	exit 1
+}
+
+if ! command -v xcrun >/dev/null 2>&1; then
+	fail 'xcrun is unavailable; run this wrapper from an active Xcode environment'
+fi
+
+[[ "${GOOS:-ios}" == 'ios' ]] || fail "GOOS must be ios, got ${GOOS:-unset}"
+[[ "${GOARCH:-arm64}" == 'arm64' ]] || fail "GOARCH must be arm64, got ${GOARCH:-unset}"
+[[ "${CGO_ENABLED:-1}" == '1' ]] || fail "CGO_ENABLED must be 1, got ${CGO_ENABLED:-unset}"
+
+deployment_target="${IOS_DEPLOYMENT_TARGET:-12.0}"
+[[ "$deployment_target" == '12.0' ]] || fail "IOS_DEPLOYMENT_TARGET must be 12.0, got $deployment_target"
+
+sdk_path="$(xcrun --sdk iphoneos --show-sdk-path)" || fail 'unable to resolve the iphoneos SDK path'
+[[ -d "$sdk_path" ]] || fail "iphoneos SDK path does not exist: $sdk_path"
+
+clang_path="$(xcrun --sdk iphoneos --find clang)" || fail 'unable to resolve clang from the iphoneos SDK'
+[[ -x "$clang_path" ]] || fail "clang is not executable: $clang_path"
+
+for arg in "$@"; do
+	case "$arg" in
+		*iphonesimulator*|*iPhoneSimulator*|*macosx*|*MacOSX*|*-mios-simulator-version-min*|*x86_64*|*i386*)
+			fail "simulator, macOS, or non-arm64 compiler argument rejected: $arg"
+			;;
+	esac
+done
+
+# Put the target flags after Go/cgo's arguments so a stale host or simulator
+# flag cannot silently override the physical-device target.
+exec "$clang_path" "$@" \
+	-arch arm64 \
+	-target "arm64-apple-ios${deployment_target}" \
+	-isysroot "$sdk_path" \
+	-mios-version-min="$deployment_target"

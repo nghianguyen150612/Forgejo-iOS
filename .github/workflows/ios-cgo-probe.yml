@@ -1,0 +1,168 @@
+name: iOS CGO probe
+
+on:
+  push:
+    branches:
+      - ios
+    paths:
+      - '.github/workflows/ios-cgo-probe.yml'
+      - 'PORTING_IOS.md'
+      - 'go.mod'
+      - 'go.sum'
+      - 'scripts/ios/**'
+      - 'tools/ios-cgo-probe/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-cgo-probe:
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      GOOS: ios
+      GOARCH: arm64
+      CGO_ENABLED: '1'
+      IOS_DEPLOYMENT_TARGET: '12.0'
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install declared Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.7'
+          cache: false
+
+      - name: Record Apple toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/ios
+          {
+            printf 'macOS version='; sw_vers -productVersion
+            printf 'XCODE_SELECT='; xcode-select -p
+            xcodebuild -version
+            printf 'IPHONEOS_SDK_PATH='; xcrun --sdk iphoneos --show-sdk-path
+            printf 'IPHONEOS_SDK_VERSION='; xcrun --sdk iphoneos --show-sdk-version
+            printf 'CLANG_PATH='; xcrun --sdk iphoneos --find clang
+            clang_path="$(xcrun --sdk iphoneos --find clang)"
+            "$clang_path" --version | head -1
+            go version
+            printf 'GOOS=%s\n' "$GOOS"
+            printf 'GOARCH=%s\n' "$GOARCH"
+            printf 'CGO_ENABLED=%s\n' "$CGO_ENABLED"
+            printf 'DEPLOYMENT_TARGET=%s\n' "$IOS_DEPLOYMENT_TARGET"
+          } | tee build/ios/toolchain-info.txt
+
+      - name: Build physical-device CGO probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ios/clang-wrapper scripts/ios/build-cgo-probe.sh
+          scripts/ios/build-cgo-probe.sh build/ios/ios-cgo-probe
+
+      - name: Inspect and sign Mach-O probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe=build/ios/ios-cgo-probe
+          file_output="$(file "$probe")"
+          printf '%s\n' "$file_output" | tee build/ios/file.txt
+          [[ "$file_output" == *'Mach-O 64-bit executable arm64'* ]] || {
+            printf 'unexpected probe format: %s\n' "$file_output" >&2
+            exit 1
+          }
+          [[ "$file_output" != *'simulator'* ]] || {
+            printf 'simulator binary rejected: %s\n' "$file_output" >&2
+            exit 1
+          }
+
+          otool -hv "$probe" | tee build/ios/macho-header.txt
+          otool -l "$probe" | tee build/ios/macho-load-commands.txt
+          otool -L "$probe" | tee build/ios/linked-libraries.txt
+
+          load_commands=build/ios/macho-load-commands.txt
+          if grep -q 'cmd LC_BUILD_VERSION' "$load_commands"; then
+            build_version_block="$(awk '
+              /cmd LC_BUILD_VERSION/ { capture=1; lines=0 }
+              capture { print; lines++ }
+              capture && lines >= 8 { capture=0 }
+            ' "$load_commands")"
+            printf '%s\n' "$build_version_block" | tee build/ios/iphoneos-version.txt
+            # Modern Xcode otool prints the Mach-O platform enum (2) instead
+            # of the symbolic name IOS. Accept both representations, while
+            # keeping simulator platform 7 explicitly out of the probe.
+            grep -Eq 'platform[[:space:]]+(IOS|2)([[:space:]]|$)' <<<"$build_version_block" || {
+              printf 'LC_BUILD_VERSION is not physical iOS (platform 2)\n' >&2
+              exit 1
+            }
+            grep -Eq 'minos[[:space:]]+12\.0([[:space:]]|$)' <<<"$build_version_block" || {
+              printf 'LC_BUILD_VERSION does not declare minos 12.0\n' >&2
+              exit 1
+            }
+          elif grep -q 'cmd LC_VERSION_MIN_IPHONEOS' "$load_commands"; then
+            iphoneos_version_block="$(awk '
+              /cmd LC_VERSION_MIN_IPHONEOS/ { capture=1; lines=0 }
+              capture { print; lines++ }
+              capture && lines >= 6 { capture=0 }
+            ' "$load_commands")"
+            printf '%s\n' "$iphoneos_version_block" | tee build/ios/iphoneos-version.txt
+            grep -Eq 'version[[:space:]]+12\.0([[:space:]]|$)' <<<"$iphoneos_version_block" || {
+              printf 'LC_VERSION_MIN_IPHONEOS does not declare version 12.0\n' >&2
+              exit 1
+            }
+          else
+            printf 'no physical iPhoneOS deployment load command found\n' >&2
+            exit 1
+          fi
+
+          if grep -Eiq 'IOSSIMULATOR|IPHONESIMULATOR|platform[[:space:]]+(SIMULATOR|7)([[:space:]]|$)|iphonesimulator' build/ios/iphoneos-version.txt; then
+            printf 'simulator deployment metadata rejected\n' >&2
+            exit 1
+          fi
+
+          if grep -Eq '/(opt/homebrew|usr/local)/.*\.dylib' build/ios/linked-libraries.txt; then
+            printf 'unexpected Homebrew/macOS dynamic library dependency\n' >&2
+            exit 1
+          fi
+
+          codesign --force --sign - --timestamp=none "$probe"
+          codesign --display --verbose=4 "$probe" 2>&1 | tee build/ios/codesign.txt
+
+      - name: Write reproducibility metadata and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            printf 'Git commit='; git rev-parse HEAD
+            cat build/ios/toolchain-info.txt
+            printf 'Compiler path='; xcrun --sdk iphoneos --find clang
+            printf 'Compiler version=\n'
+            clang_path="$(xcrun --sdk iphoneos --find clang)"
+            "$clang_path" --version | head -1
+            printf '%s\n' '--- file ---'
+            cat build/ios/file.txt
+            printf '%s\n' '--- Mach-O header ---'
+            cat build/ios/macho-header.txt
+            printf '%s\n' '--- iPhoneOS deployment ---'
+            cat build/ios/iphoneos-version.txt
+            printf '%s\n' '--- linked libraries ---'
+            cat build/ios/linked-libraries.txt
+            printf '%s\n' '--- code signature ---'
+            cat build/ios/codesign.txt
+          } > build/ios/build-info.txt
+          (cd build/ios && shasum -a 256 ios-cgo-probe > SHA256SUMS)
+          cat build/ios/SHA256SUMS
+
+      - name: Upload iPhoneOS CGO probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-cgo-probe
+          if-no-files-found: error
+          path: |
+            build/ios/ios-cgo-probe
+            build/ios/SHA256SUMS
+            build/ios/build-info.txt
