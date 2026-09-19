@@ -5,10 +5,19 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$script_dir/../.." && pwd)"
 output_path="${1:-$repo_root/build/ios/native-c-probe}"
+source_path="${2:-tools/ios-runtime-probes/native-c/main.c}"
 
 if [[ "$output_path" != /* ]]; then
 	output_path="$repo_root/$output_path"
 fi
+if [[ "$source_path" != /* ]]; then
+	source_path="$repo_root/$source_path"
+fi
+
+[[ -f "$source_path" ]] || {
+	printf 'iOS native C probe: source file does not exist: %s\n' "$source_path" >&2
+	exit 1
+}
 
 mkdir -p "$(dirname -- "$output_path")"
 cd "$repo_root"
@@ -38,7 +47,8 @@ clang_path="$(xcrun --sdk iphoneos --find clang)"
 	-O2 \
 	-Wall \
 	-Wextra \
+	-I"$repo_root/tools/ios-runtime-probes/arm64-instructions" \
 	-o "$output_path" \
-	 tools/ios-runtime-probes/native-c/main.c
+	 "$source_path"
 
 printf 'iOS native C probe built: %s\n' "$output_path"

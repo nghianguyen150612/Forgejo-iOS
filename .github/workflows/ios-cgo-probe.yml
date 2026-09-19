@@ -74,6 +74,18 @@ jobs:
           scripts/ios/build-native-c-probe.sh build/ios/native-c-probe 2>&1 | tee build/ios/native-c-build.log
           printf 'native-c=PASS\n' >> build/ios/build-status.txt
 
+      - name: Build ARM64 instruction probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for instruction in isb cntfrq cntvct yield; do
+            scripts/ios/build-native-c-probe.sh \
+              "build/ios/arm64-${instruction}-probe" \
+              "tools/ios-runtime-probes/arm64-instructions/${instruction}/main.c" \
+              2>&1 | tee "build/ios/arm64-${instruction}-build.log"
+            printf 'arm64-%s=PASS\n' "$instruction" >> build/ios/build-status.txt
+          done
+
       - name: Install Go 1.20.14 toolchain
         uses: actions/setup-go@v5
         with:
@@ -119,6 +131,19 @@ jobs:
             printf 'Go 1.20.14 CGO probe build failed with exit %s; continuing for diagnostic artifact\n' "$status"
           fi
 
+          if run_probe go120-multip "scripts/ios/build-runtime-probe.sh" build/ios/go120-multip-probe tools/ios-runtime-probes/go-multip/main.go; then
+            printf 'go120-multip=PASS\n' >> build/ios/build-status.txt
+            go tool objdump -s 'runtime.procyield' build/ios/go120-multip-probe >build/ios/go120-procyield-objdump.txt 2>&1 || true
+            goroot="$(go env GOROOT)"
+            shasum -a 256 "$goroot/src/runtime/asm_arm64.s" >build/ios/go120-runtime-source-sha256.txt
+            awk '/TEXT runtime·procyield\(SB\)/ { capture=1 } capture { print } capture && /RET/ { exit }' \
+              "$goroot/src/runtime/asm_arm64.s" >build/ios/go120-procyield-source.txt
+          else
+            status=$?
+            printf 'go120-multip=FAIL exit=%s\n' "$status" >> build/ios/build-status.txt
+            printf 'Go 1.20.14 multi-P probe build failed with exit %s; continuing for diagnostic artifact\n' "$status"
+          fi
+
       - name: Restore Go 1.26.7 toolchain
         uses: actions/setup-go@v5
         with:
@@ -140,6 +165,14 @@ jobs:
           scripts/ios/build-runtime-probe.sh build/ios/go126-probe tools/ios-runtime-probes/go/main.go 2>&1 | tee build/ios/go126-build.log
           printf 'go126-pure=PASS\n' >> build/ios/build-status.txt
 
+          scripts/ios/build-runtime-probe.sh build/ios/go126-multip-probe tools/ios-runtime-probes/go-multip/main.go 2>&1 | tee build/ios/go126-multip-build.log
+          printf 'go126-multip=PASS\n' >> build/ios/build-status.txt
+          go tool objdump -s 'runtime.procyieldAsm' build/ios/go126-multip-probe >build/ios/go126-procyield-objdump.txt 2>&1 || true
+          goroot="$(go env GOROOT)"
+          shasum -a 256 "$goroot/src/runtime/asm_arm64.s" "$goroot/src/runtime/stubs.go" >build/ios/go126-runtime-source-sha256.txt
+          awk '/TEXT runtime·procyieldAsm\(SB\)/ { capture=1 } capture { print } capture && /RET/ { exit }' \
+            "$goroot/src/runtime/asm_arm64.s" >build/ios/go126-procyield-source.txt
+
           # Keep the Prompt 002 build command and output alive as a regression
           # check, then give the same signed executable its matrix name.
           scripts/ios/build-cgo-probe.sh build/ios/ios-cgo-probe 2>&1 | tee build/ios/go126-cgo-build.log
@@ -154,9 +187,15 @@ jobs:
             build/ios \
             build/ios/probe-inspection.txt \
             native-c-probe \
+            arm64-isb-probe \
+            arm64-cntfrq-probe \
+            arm64-cntvct-probe \
+            arm64-yield-probe \
             go120-probe \
             go120-cgo-probe \
+            go120-multip-probe \
             go126-probe \
+            go126-multip-probe \
             go126-cgo-probe
 
       - name: Write reproducibility metadata and checksums
@@ -173,12 +212,17 @@ jobs:
               printf '%s\n' "--- $log ---"
               cat "$log"
             done
+            for diagnostic in build/ios/*-runtime-source-sha256.txt build/ios/*-procyield-source.txt build/ios/*-procyield-objdump.txt; do
+              [[ -f "$diagnostic" ]] || continue
+              printf '%s\n' "--- $diagnostic ---"
+              cat "$diagnostic"
+            done
             printf '%s\n' '--- Mach-O and signing inspection ---'
             cat build/ios/probe-inspection.txt
           } > build/ios/build-info.txt
 
           : > build/ios/SHA256SUMS
-          for probe in native-c-probe go120-probe go120-cgo-probe go126-probe go126-cgo-probe; do
+          for probe in native-c-probe arm64-isb-probe arm64-cntfrq-probe arm64-cntvct-probe arm64-yield-probe go120-probe go120-cgo-probe go120-multip-probe go126-probe go126-multip-probe go126-cgo-probe; do
             if [[ -f "build/ios/$probe" ]]; then
               (cd build/ios && shasum -a 256 "$probe") >> build/ios/SHA256SUMS
             fi
@@ -192,9 +236,15 @@ jobs:
           if-no-files-found: error
           path: |
             build/ios/native-c-probe
+            build/ios/arm64-isb-probe
+            build/ios/arm64-cntfrq-probe
+            build/ios/arm64-cntvct-probe
+            build/ios/arm64-yield-probe
             build/ios/go120-probe
             build/ios/go120-cgo-probe
+            build/ios/go120-multip-probe
             build/ios/go126-probe
+            build/ios/go126-multip-probe
             build/ios/go126-cgo-probe
             build/ios/SHA256SUMS
             build/ios/build-info.txt

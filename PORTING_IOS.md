@@ -1183,3 +1183,181 @@ explicit and reproducible, then evaluate the smallest safe path toward
 restoring multi-processor behavior on A7. Keep the production Go requirement
 at Go 1.26.7 until that evidence exists; do not backport Forgejo to Go 1.20
 based on the earlier P2/P3 signing failure.
+
+## Prompt 006 A7 scheduler policy and multi-P SIGILL isolation
+
+Prompt 006 continued from the complete P5 commit
+`7e2598540195461d7a42077c1ec1401f739cf581`. It did not change Forgejo
+production Go packages, `go.mod`, `go.sum`, the iPhoneOS build target, or the
+P5 signing entitlement. The prompt formalized the current A7-safe launch
+policy and isolated the multi-processor crash to a userspace counter-register
+access in Go 1.26.7's arm64 runtime yield path.
+
+### Supported A7/iOS 12 launch policy
+
+The project-owned launcher is `scripts/ios/run-forgejo.sh`. It preserves an
+explicit `GOMAXPROCS` value for diagnostics, but when no override is supplied
+and the target identifies as `iPad4,4`, `iPad4,5`, or `iPad4,6` on Darwin
+`18.*`, it exports:
+
+```text
+GOMAXPROCS=1
+```
+
+This policy is intentionally scoped to the Apple A7 iPad mini 2/iPad Air
+family on iOS 12.x. It is not a claim that all iOS devices require one P, and
+it does not globally bake single-core operation into Forgejo source. Future
+SoCs and iOS versions must be tested independently. The launcher prints the
+detected machine, Darwin release, selected policy, and effective `GOMAXPROCS`,
+then `exec`s the real Forgejo binary so signals are delivered to Forgejo
+rather than retained by a long-lived wrapper.
+
+The established P5 production Forgejo binary was retested on the iPad under a
+new P6 runtime directory at:
+
+```text
+/var/nghianguyen/forgejo-ios-p6/7e2598540195461d7a42077c1ec1401f739cf581/runtime
+```
+
+With `GOMAXPROCS=1`, two consecutive server starts on port `39124` succeeded.
+Each run detected `/usr/bin/git` version `2.39.1`, enabled SQLite3 support,
+completed ORM initialization, listened on `127.0.0.1`, returned HTTP `200`
+with the `Forgejo iOS Prompt 006` page title, handled SIGTERM with wait status
+`0`, and left no orphan Forgejo process.
+
+### Multi-P failure reproduction
+
+Using the same signed production binary and only changing the scheduler
+setting, `GOMAXPROCS=2 forgejo --version` reproduced the P5 crash under
+`GOTRACEBACK=crash`:
+
+```text
+SIGILL: illegal instruction
+PC=0x10095902c
+runtime.procyieldAsm(0x80)
+fault 0x10095902c
+```
+
+This confirmed that the failure is not tied to SQLite, HTTP, or the Forgejo
+configuration. It occurs during Go/Forgejo initialization when the Go runtime
+uses more than one P.
+
+### Exact Go 1.26.7 runtime implementation
+
+The exact Go 1.26.7 toolchain used by the final P6 runtime-matrix workflow was
+recorded from GitHub Actions:
+
+```text
+Go: go1.26.7 darwin/arm64
+GOROOT: /Users/runner/hostedtoolcache/go/1.26.7/arm64
+runtime/asm_arm64.s SHA-256: c2d54a06306c90a1d6ab666101c563056578a84c9b11f50575874af9c54b2133
+runtime/stubs.go SHA-256: 0572c8b87cdbd975e8fddc5e8e84240d6397445589641035f0ce95e6676ee90e
+```
+
+The relevant `runtime.procyieldAsm` body in Go 1.26.7 is a counter/timer based
+delay loop. It starts with `ISB`, reads `CNTFRQ_EL0`, reads `CNTVCT_EL0`, then
+loops with another `ISB` and further `CNTVCT_EL0` reads until the requested
+counter delta has elapsed. The build artifact also records the corresponding
+object dump:
+
+```text
+0x10007a4d8  ISB $15
+0x10007a4e8  MRS $24320, R1   ; CNTFRQ_EL0
+0x10007a4fc  MRS $24322, R2   ; CNTVCT_EL0
+0x10007a500  ISB $15
+0x10007a504  MRS $24322, R1   ; CNTVCT_EL0
+```
+
+The P6 minimal Go 1.26.7 scheduler-contention probe repeatedly crashed at
+`runtime.procyieldAsm +0x2c`, which maps to `asm_arm64.s:1126`, the first
+`MRS CNTVCT_EL0` instruction. Three `GOMAXPROCS=2` runs failed with SIGILL
+before completing the bounded workload. Three `GOMAXPROCS=1` runs completed
+successfully.
+
+### ARM64 instruction matrix on A7/iOS 12
+
+P6 added native physical-iOS instruction probes under
+`tools/ios-runtime-probes/arm64-instructions/`. Each probe prints a marker
+before and after its candidate instruction and is signed on-device with the
+same `com.apple.private.security.no-container` entitlement.
+
+| Instruction | Build | Launch | Execute | Exit/signal | Classification |
+| ----------- | ----- | ------ | ------- | ----------- | -------------- |
+| `ISB` | PASS | PASS | printed `AFTER=ISB` | `0` | SUPPORTED |
+| `MRS CNTFRQ_EL0` | PASS | PASS | printed `AFTER=CNTFRQ_EL0 VALUE=24000000` | `0` | SUPPORTED at EL0 |
+| `MRS CNTVCT_EL0` | PASS | PASS | printed `BEFORE=CNTVCT_EL0`, then signal handler | `132` / `SIGILL` | TRAPS at EL0 |
+| `YIELD` | PASS | PASS | printed `AFTER=YIELD` | `0` | SUPPORTED |
+
+This distinguishes CPU support from userspace accessibility: P6 proves that
+`CNTVCT_EL0` is not usable from this process context on the A7/iOS 12 target.
+It does not claim the A7 lacks the architectural counter.
+
+### Minimal scheduler reproducer and Go 1.20 comparison
+
+P6 added `tools/ios-runtime-probes/go-multip/`, a bounded standalone Go probe
+with no third-party dependencies. It prints `runtime.Version`, `runtime.NumCPU`,
+and `GOMAXPROCS`, then runs a finite allocation/synchronization/GC workload
+across multiple goroutines and exits with `RESULT=PASS` on success.
+
+Real-device results using the same no-container signing treatment:
+
+| Toolchain | `GOMAXPROCS=1` | `GOMAXPROCS=2` |
+| --------- | -------------- | -------------- |
+| Go 1.20.14 | 3/3 PASS | 3/3 PASS |
+| Go 1.26.7 | 3/3 PASS | 3/3 SIGILL at `runtime.procyieldAsm +0x2c` |
+
+Go 1.20.14's arm64 runtime implementation was inspected only as a diagnostic
+reference. Its `runtime.procyield` loop uses `YIELD`, `SUBW`, and `CBNZ`; it
+does not read `CNTVCT_EL0`. This explains why the Go 1.20 multi-P probe can
+complete on the same device while Go 1.26.7 fails, without implying Forgejo
+should be backported to Go 1.20.
+
+### Runtime experiment decision
+
+**EXPERIMENTAL, NOT ADOPTED:** a narrowly patched Go 1.26.7 runtime could
+replace the iOS/arm64 `procyieldAsm` counter-delay path with an older
+`YIELD`-based fallback, but P6 did not adopt that patch. Although the culprit
+instruction is now identified, changing scheduler-spin behavior in the Go
+runtime is a correctness-sensitive toolchain change. The project currently has
+a safe production policy (`GOMAXPROCS=1`) and a precise reproducer, so a
+runtime patch should be developed and reviewed as a dedicated follow-up rather
+than rushed into P6.
+
+No system Go installation, runner toolchain, or local user Go installation was
+modified. No Go runtime source or toolchain binary was committed.
+
+### Evidence classification and Prompt 007 boundary
+
+**PROVEN**
+
+- P5 Forgejo production functionality remains green on A7/iOS 12 when launched
+  with `GOMAXPROCS=1`.
+- The multi-P production crash is reproducible with `GOMAXPROCS=2` and reaches
+  `runtime.procyieldAsm`.
+- Go 1.26.7's exact `procyieldAsm` uses `CNTVCT_EL0`; the minimal Go 1.26.7
+  P=2 probe faults at the first `CNTVCT_EL0` read.
+- Standalone native probes show `ISB`, `CNTFRQ_EL0`, and `YIELD` execute, while
+  `CNTVCT_EL0` traps with SIGILL in this userspace context.
+- Go 1.20.14's bounded multi-P scheduler probe passes on the same device.
+- `scripts/ios/run-forgejo.sh` provides a scoped A7/iOS 12 default policy and
+  preserves explicit diagnostic overrides.
+
+**INFERRED**
+
+- The production Forgejo SIGILL and minimal Go 1.26.7 P=2 SIGILL share the
+  same root cause: Go 1.26.7's arm64 `procyieldAsm` reads `CNTVCT_EL0`, which
+  traps from this A7/iOS 12 userspace environment.
+- A YIELD-style fallback is a plausible compatibility strategy because it is
+  used by Go 1.20.14 and the standalone `YIELD` probe succeeds, but scheduler
+  correctness and performance require a separate toolchain experiment.
+
+**NOT TESTED**
+
+- A patched Go 1.26.7 runtime/toolchain.
+- Production Forgejo with `GOMAXPROCS=2` after a runtime patch.
+- Other iOS hardware, later iOS releases, or non-A7 devices.
+
+Recommended Prompt 007: build an isolated Go 1.26.7 experimental toolchain that
+changes only the iOS/arm64 `procyieldAsm` fallback away from `CNTVCT_EL0`, then
+validate the bounded Go scheduler probe and production Forgejo with
+`GOMAXPROCS=2` on the A7 device before considering that runtime path supported.
