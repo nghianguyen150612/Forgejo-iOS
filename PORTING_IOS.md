@@ -719,3 +719,232 @@ Do not backport Forgejo to Go 1.20.14, patch the Go runtime, change Forgejo's
 module requirements, or compile Forgejo production packages until that lower
 device execution blocker is resolved. This is a device/toolchain/signing
 investigation, not yet evidence for strategy A or B.
+
+## Prompt 004 device-accepted execution path
+
+Prompt 004 continued from commit
+`8306fd07b11d16c481a26d42fc34c920e99ba066`. It remained a probe and signing
+diagnosis only: no Forgejo production package, `go.mod`, or `go.sum` was
+changed. The purpose was to distinguish a device acceptance failure from a Go
+runtime failure and to rerun the existing P3 matrix after that lower layer was
+fixed.
+
+### Device and Amethyst inventory
+
+The checks below were performed through the existing SSH session as the
+unprivileged `nghianguyen` account. No jailbreak update, re-jailbreak, package
+installation, root escalation, or system-file modification was attempted.
+
+- The device is `iPad4,4`, Apple A7, arm64, iOS/iPadOS `12.5.7` build `16H81`,
+  Darwin `18.7.0`.
+- This is a rootful layout: `/amethyst` exists and `/var/jb` does not. The
+  jailbreak base components were present at `/amethyst/jbutil`,
+  `/amethyst/launchd_hook.dylib`, and `/usr/lib/base_hook.dylib`.
+- All three components had owner `mobile:staff`, mode `0755`, and the same
+  installation timestamp, `Sep 17 21:47`. Their SHA-256 values were:
+
+  ```text
+  /amethyst/jbutil             8e491f060d0963ac375ab8065712f6f7ddad31e4056a02b00c5164da3fb2542b
+  /amethyst/launchd_hook.dylib e785970d74870cfe7883f5e7824792987b68f286c87b53652603ff64d715431f
+  /usr/lib/base_hook.dylib     63515ea4274ed3dd35aa61caff005832df7f4b39ae6145a4e044742846e3f6a
+  /usr/lib/libjailbreak.dylib  d0028116d23e163a93748244fc61332050716278ab4eb2f1a270d95e081a0723
+  ```
+
+- No core Amethyst package/version file was exposed by the readable local
+  metadata. The installed package `com.staturnz.tnsv2-updater` is version
+  `1.0.3`; its package description identifies it as the TNSv2 support package
+  for updating Amethyst jailbreak files, so this is bootstrap/updater evidence
+  and not proof that the device's core Amethyst binaries are release `1.0.3`.
+  The core Amethyst version is therefore **UNKNOWN**, not silently equated to
+  an upstream release. The readable `/amethyst` directory contained only
+  `dyld_patch`, `handoff.plist`, `jbutil`, and `launchd_hook.dylib`.
+- The SSH shell already exported
+  `DYLD_INSERT_LIBRARIES=/usr/lib/base_hook.dylib`. With
+  `DYLD_PRINT_LIBRARIES=1`, the device reported that `base_hook.dylib` was
+  loaded into both the shell and a child `/usr/bin/true`. This proves the
+  expected hook was active for this diagnostic launch path, although the
+  unprivileged session cannot inspect its kernel-side state.
+- `launchctl print system` and the readable launch-daemon directories did not
+  expose a separately named Amethyst/jbserver service. The visible launchd
+  process was PID 1. The launchd hook's presence and the observed base-hook
+  load are the usable state evidence.
+
+The official Amethyst source was also inspected as a behavioral reference.
+Its `base_hook` initializes the jailbreak server and loader, its loader calls
+the binary-processing path before spawning a child, and the server can sign or
+trust-cache fakesigned Mach-O dependencies. The source's unsandbox selection
+also treats `com.apple.private.security.no-container` as a full-unsandbox
+indicator. These source facts explain why the entitlement ladder below is a
+meaningful test; they do not prove that the device binaries are byte-for-byte
+from the currently published source. See the [Amethyst source repository](https://github.com/staturnzz/amethyst),
+[`loader.c`](https://github.com/staturnzz/amethyst/blob/main/basebins/launchd_hook/src/loader.c),
+[`basebin_jbserver.c`](https://github.com/staturnzz/amethyst/blob/main/basebins/common/src/basebin_jbserver.c),
+and [`basebin_macho.c`](https://github.com/staturnzz/amethyst/blob/main/basebins/common/src/basebin_macho.c).
+
+### Working jailbreak reference binaries
+
+Two installed non-Apple command-line executables were selected as golden
+references. Their byte-identical copies were placed under the dedicated P4
+diagnostic directory and executed before any modification.
+
+| Reference | Build/runtime evidence | Code signature and entitlements |
+| --- | --- | --- |
+| `/usr/bin/ldid` | Mach-O arm64; root:wheel `0755`; SHA-256 `67a735a3f8cd65dbf27015b1e92d69ee15956dac2bf14bf5af7a54f5548fe041`; `Link Identity Editor 2.1.5-procursus6`; no-argument usage exit `0` | CodeDirectory v`20400`, flags `0x2(adhoc)`, SHA-256; exactly `platform-application`, `com.apple.private.security.no-container`, and `com.apple.private.skip-library-validation` |
+| `/usr/bin/git` | Mach-O arm64; root:wheel `0755`; SHA-256 `845447a72617d05813d03faa4b99d3d0a78816c7ae940ff4ee6a6a6761ac03fd`; `git version 2.39.1`; no-argument usage exit `1` | CodeDirectory v`20400`, flags `0x2(adhoc)`, SHA-256; the same three entitlements as `/usr/bin/ldid` |
+
+`/amethyst/jbutil` was also inspected as a third reference. It is a universal
+arm64/arm64e Mach-O with SHA-256
+`8e491f060d0963ac375ab8065712f6f7ddad31e4056a02b00c5164da3fb2542b`,
+CodeDirectory flags `0x0(none)`, and a much larger Amethyst helper entitlement
+set. Its untouched copy executed its usage path with exit `22`. It was not
+used as a signing template because most of its entitlements are privileged
+helper-specific and are not justified for a Forgejo probe.
+
+The installed ldid is the Procursus package `ldid 2.1.5-procursus6`, owned by
+the `ldid` package. The available options include `-S`, `-Cadhoc`,
+`-e`, and CodeDirectory inspection. No replacement ldid was installed, and
+host-side ldid semantics were not assumed to match this device implementation.
+
+### Untouched versus re-signed copies
+
+The original installed files were never modified. Byte-identical copies of
+`ldid`, `git`, and `jbutil` retained their normal usage behavior. A separate
+copy of each was then processed with `/usr/bin/ldid -S`, and another with
+`/usr/bin/ldid -S -Cadhoc`, without an entitlement plist. Every re-signed
+copy was killed with exit `137` before its normal usage output. For example,
+the ldid copy changed from CodeDirectory flags `0x2(adhoc)` and the three
+entitlements to flags `0x0(none)` or `0x2(adhoc)` with no entitlements, and
+both versions died.
+
+This reproduces the P3 control behavior: an Apple-signed `/usr/bin/true` and
+its byte-identical copied signature execute, while an ldid-re-signed copy is
+killed. The result isolates the failure to device binary acceptance/signing
+policy rather than the `/var` project directory, a Go startup path, or user
+code.
+
+### Native C entitlement ladder
+
+Each row started from the same checksum-controlled P3 native C executable.
+Only the copied file was signed. The test was run in the SSH shell with the
+active Amethyst base hook.
+
+| Entitlements in the ldid-generated copy | Runtime result |
+| --- | --- |
+| none (`ldid -S`) | exit `137`, no output |
+| `platform-application` | exit `137`, no output |
+| `com.apple.private.security.no-container` | **exit `0`**, required marker |
+| `com.apple.private.skip-library-validation` | exit `137`, no output |
+| `platform-application` + `com.apple.private.security.no-container` | **exit `0`**, required marker |
+| `platform-application` + `com.apple.private.skip-library-validation` | exit `137`, no output |
+| `com.apple.private.security.no-container` + `com.apple.private.skip-library-validation` | **exit `0`**, required marker |
+| all three reference entitlements | **exit `0`**, required marker |
+
+The accepted minimal copy was generated with:
+
+```text
+/usr/bin/ldid -Sdevice-entitlements-no-container.plist native-c-probe-copy
+```
+
+It had CodeDirectory flags `0x0(none)`, SHA-256, and only
+`com.apple.private.security.no-container`. Its SHA-256 was
+`360efa7b64084f5562e508a471cf10b54f07ae8ef1cf0ac7ecca5de2fcfc1b94`. It
+printed exactly:
+
+```text
+forgejo-ios native C probe
+C_RUNTIME=ok
+```
+
+and exited `0`. An explicit `-Cadhoc` copy containing all three reference
+entitlements also passed, so the successful condition is not dependent on
+the CodeDirectory adhoc flag alone. The project-side fixture intentionally
+contains only the one entitlement demonstrated as sufficient by the ladder;
+it does not copy the privileged `jbutil` plist.
+
+### Filesystem-location experiment
+
+The same checksum-identical, no-container-signed native C copy executed from
+the P4 directory under `/var`, `/tmp`, and `/var/tmp`. All three produced the
+required marker and exit `0`, with SHA-256
+`360efa7b64084f5562e508a471cf10b54f07ae8ef1cf0ac7ecca5de2fcfc1b94`.
+`/tmp` and `/var/tmp` are both on the device's `/private/var` APFS mount, so
+this proves the result is not tied to the original project directory but does
+not claim a root-filesystem path comparison. `/amethyst`, `/`, `/private`,
+and `/usr/local/bin` were not writable by the SSH user and were not modified.
+
+### Go matrix after accepted signing
+
+The same minimal signing treatment was applied to fresh copies of the final
+P3 artifacts. The original CI ad-hoc files remained unchanged. All transfers
+were checksum-verified before execution, and every accepted copy was inspected
+as a Mach-O arm64 physical-iOS executable before running.
+
+| Probe | Signing treatment | Accepted-copy SHA-256 | stdout | stderr | exit |
+| --- | --- | --- | --- | --- | ---: |
+| Go 1.20.14 pure | `ldid -S` + no-container only | `882bb4a08d62cf9ead434d04efa079541d63e7ba94dc2f602584e072c52990b1` | `forgejo-ios pure Go probe`; `GO_VERSION=go1.20.14`; `GOOS=ios`; `GOARCH=arm64`; `GO_RUNTIME=ok` | empty | `0` |
+| Go 1.20.14 CGO | `ldid -S` + no-container only | `90b765069453b3faf950da2b75f5f992fd66c682d39c7771b200f9d60b52920c` | `forgejo-ios cgo probe`; `GOOS=ios`; `GOARCH=arm64`; `CGO=ok`; `C_VALUE=42` | empty | `0` |
+| Go 1.26.7 pure | `ldid -S` + no-container only | `a31223b83883d16fabd6e82ec3b871c278d49ab51fb8b44c96762a51061500ff` | `forgejo-ios pure Go probe`; `GO_VERSION=go1.26.7`; `GOOS=ios`; `GOARCH=arm64`; `GO_RUNTIME=ok` | empty | `0` |
+| Go 1.26.7 CGO | `ldid -S` + no-container only | `dd2a2e95e895b28ae6e040dbae0259e4d4ca646491c3db42b4f89d627328d293` | `forgejo-ios cgo probe`; `GOOS=ios`; `GOARCH=arm64`; `CGO=ok`; `C_VALUE=42` | empty | `0` |
+
+The explicit `ldid -S ... -Cadhoc` copies of all four Go probes also ran with
+exit `0` and the same markers. Therefore the current real-device startup
+matrix is:
+
+```text
+native C       -> PASS with accepted no-container entitlement
+Go 1.20.14     -> PASS with accepted no-container entitlement
+Go 1.20.14 CGO -> PASS with accepted no-container entitlement
+Go 1.26.7      -> PASS with accepted no-container entitlement
+Go 1.26.7 CGO  -> PASS with accepted no-container entitlement
+```
+
+### Evidence classification
+
+- **PROVEN:** the Apple clang native C probe executes on iOS 12.5.7 and
+  returns `0` after the minimal device-accepted ldid treatment.
+- **PROVEN:** Go 1.20.14 and Go 1.26.7 both start and complete the pure-Go
+  and CGO probes on the same iPad under the same accepted treatment.
+- **PROVEN:** the P2/P3 `SIGKILL` was not caused by Go 1.26.7, Go 1.20.14,
+  CGO, the physical-iOS Mach-O target, or the writable `/var` location in
+  isolation. Removing the demonstrated entitlement-bearing acceptance model
+  reproduces the failure even for known-working jailbreak tools.
+- **STRONG INFERENCE:** the primary P2 launch blocker was the Amethyst/AMFI
+  device acceptance model. For this rootful environment, the smallest
+  empirically accepted probe signature is an ldid-generated CodeDirectory
+  carrying `com.apple.private.security.no-container`; the hook was active,
+  but the exact kernel-side action that made the entitlement necessary was not
+  directly observable from the unprivileged account.
+- **UNKNOWN:** this startup probe does not establish full Go 1.26.7 support
+  for every Darwin 18 syscall or runtime path, nor does it establish that the
+  full Forgejo binary will need no additional entitlements or launch setup.
+  The official Go support boundary remains relevant for later compatibility
+  auditing, but it is not the observed cause of the P2/P3 pre-startup death.
+
+### Diagnostics and remaining uncertainty
+
+The device user could not read the kernel buffer (`dmesg` returned
+`Operation not permitted`). No readable system log, AMFI report, `codesign`,
+or `otool` implementation was available. Consequently, the exact AMFI reason
+for the no-entitlement kill is inferred from the controlled ladder and the
+working-reference comparison, not from a kernel log line. The installed core
+Amethyst version is also not recoverable from readable local metadata beyond
+the TNSv2 updater package and component hashes above.
+
+The reproducible project-side procedure is
+`scripts/ios/run-device-runtime-probes.sh`. It refuses an existing remote
+directory, transfers the final CI artifact and the minimal entitlement
+fixture, verifies `SHA256SUMS` on the device, runs each original CI copy, and
+then signs and runs a separate accepted copy with the existing
+`/usr/bin/ldid`. It does not install packages, modify Amethyst, mutate source
+artifacts, or overwrite P2/P3 directories.
+
+### Prompt 005 recommendation
+
+Carry the empirically accepted device-side signing step forward as a
+deployment/test prerequisite, while keeping `go 1.26.0` and
+`toolchain go1.26.7` unchanged. The next prompt can begin the smallest
+Forgejo production build/runtime probe with the same physical-iOS toolchain,
+the accepted signing treatment, and explicit artifact inspection. Start with
+the root executable and SQLite/CGO boundary, then test process/filesystem/Git
+behavior on-device. Do not backport Forgejo to Go 1.20.14 or patch the Go
+runtime based solely on the previously masked SIGKILL.
