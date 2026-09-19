@@ -1,0 +1,165 @@
+name: iOS Forgejo production build
+
+on:
+  push:
+    branches:
+      - ios
+    paths:
+      - '.github/workflows/ios-forgejo-production.yml'
+      - 'Makefile'
+      - 'PORTING_IOS.md'
+      - 'go.mod'
+      - 'go.sum'
+      - 'main.go'
+      - 'cmd/**'
+      - 'modules/**'
+      - 'models/**'
+      - 'routers/**'
+      - 'services/**'
+      - 'scripts/ios/**'
+      - 'tools/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forgejo-production:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      GOOS: ios
+      GOARCH: arm64
+      CGO_ENABLED: '1'
+      GOTOOLCHAIN: local
+      IOS_DEPLOYMENT_TARGET: '12.0'
+      FORGEJO_VERSION: '15.0.9'
+      FORGEJO_VERSION_API: '15.0.9+gitea-1.22.0'
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Go 1.26.7 toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.7'
+          cache: false
+
+      - name: Record build environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/ios
+          {
+            printf 'Git commit='; git rev-parse HEAD
+            printf 'Git describe='; git describe --exclude '*-test' --tags --always
+            printf 'RUNNER_ARCH='; uname -m
+            printf 'macOS version='; sw_vers -productVersion
+            printf 'XCODE_SELECT='; xcode-select -p
+            xcodebuild -version
+            printf 'IPHONEOS_SDK_PATH='; xcrun --sdk iphoneos --show-sdk-path
+            printf 'IPHONEOS_SDK_VERSION='; xcrun --sdk iphoneos --show-sdk-version
+            printf 'CLANG_PATH='; xcrun --sdk iphoneos --find clang
+            clang_path="$(xcrun --sdk iphoneos --find clang)"
+            "$clang_path" --version | head -1
+            printf 'GO_VERSION='; go version
+            printf 'GOOS='; go env GOOS
+            printf 'GOARCH='; go env GOARCH
+            printf 'CGO_ENABLED='; go env CGO_ENABLED
+            printf 'GOVERSION='; go env GOVERSION
+            printf 'DEPLOYMENT_TARGET=%s\n' "$IOS_DEPLOYMENT_TARGET"
+            printf 'FORGEJO_VERSION=%s\n' "$FORGEJO_VERSION"
+            printf 'FORGEJO_VERSION_API=%s\n' "$FORGEJO_VERSION_API"
+          } | tee build/ios/toolchain-info.txt
+
+      - name: Build minimal production variant
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ios/build-forgejo.sh scripts/ios/inspect-forgejo-binary.sh
+          set +e
+          scripts/ios/build-forgejo.sh build/ios/forgejo-minimal-pristine 'bindata timetzdata' >build/ios/minimal-build.log 2>&1
+          status=$?
+          set -e
+          printf 'minimal=%s\n' "$status" | tee build/ios/minimal-status.txt
+          exit 0
+
+      - name: Build SQLite production variant
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          scripts/ios/build-forgejo.sh build/ios/forgejo-ios-pristine 'bindata timetzdata sqlite sqlite_unlock_notify' >build/ios/sqlite-build.log 2>&1
+          status=$?
+          set -e
+          printf 'sqlite=%s\n' "$status" | tee build/ios/sqlite-status.txt
+          if [[ "$status" -ne 0 ]]; then
+            printf 'SQLite production build failed; preserving diagnostic logs\n' >&2
+            exit "$status"
+          fi
+
+      - name: Inspect and ad-hoc sign production artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/ios/inspect-forgejo-binary.sh \
+            build/ios/forgejo-ios-pristine \
+            build/ios/forgejo-inspection.txt
+          cp build/ios/forgejo-ios-pristine build/ios/forgejo-ios
+          codesign --force --sign - --timestamp=none build/ios/forgejo-ios
+          codesign --verify --verbose=4 build/ios/forgejo-ios
+          codesign --display --verbose=4 build/ios/forgejo-ios >build/ios/forgejo-codesign.txt 2>&1
+
+      - name: Write production build metadata and checksums
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cat build/ios/toolchain-info.txt
+            printf '%s\n' '--- build status ---'
+            cat build/ios/minimal-status.txt 2>/dev/null || true
+            cat build/ios/sqlite-status.txt 2>/dev/null || true
+            printf '%s\n' '--- minimal build log ---'
+            cat build/ios/minimal-build.log 2>/dev/null || true
+            printf '%s\n' '--- SQLite build log ---'
+            cat build/ios/sqlite-build.log 2>/dev/null || true
+            printf '%s\n' '--- Mach-O inspection ---'
+            cat build/ios/forgejo-inspection.txt 2>/dev/null || true
+            printf '%s\n' '--- code signature ---'
+            cat build/ios/forgejo-codesign.txt 2>/dev/null || true
+          } >build/ios/build-info.txt
+          : >build/ios/SHA256SUMS
+          for artifact in forgejo-ios-pristine forgejo-ios; do
+            if [[ -f "build/ios/$artifact" ]]; then
+              (cd build/ios && shasum -a 256 "$artifact") >>build/ios/SHA256SUMS
+            fi
+          done
+          cat build/ios/SHA256SUMS
+
+      - name: Upload Forgejo production artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-forgejo-production
+          if-no-files-found: error
+          path: |
+            build/ios/forgejo-ios-pristine
+            build/ios/forgejo-ios
+            build/ios/SHA256SUMS
+            build/ios/build-info.txt
+
+      - name: Upload production build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-forgejo-production-diagnostics
+          if-no-files-found: warn
+          path: |
+            build/ios/build-info.txt
+            build/ios/toolchain-info.txt
+            build/ios/*-build.log
+            build/ios/*-status.txt

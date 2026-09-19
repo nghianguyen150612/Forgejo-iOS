@@ -948,3 +948,238 @@ the accepted signing treatment, and explicit artifact inspection. Start with
 the root executable and SQLite/CGO boundary, then test process/filesystem/Git
 behavior on-device. Do not backport Forgejo to Go 1.20.14 or patch the Go
 runtime based solely on the previously masked SIGKILL.
+
+## Prompt 005 production Forgejo build and boot
+
+Prompt 005 continued from the single P4 commit
+`45c6a719c3c36e35503465ad8a6321678def9c55`. The final production artifact
+for this prompt is built by the `iOS Forgejo production build` workflow from
+the final P5 commit. The workflow's `build-info.txt` and `SHA256SUMS` are the
+authoritative final-commit provenance and checksum records; the same checksum
+file was verified on the iPad before the working copy was signed. No
+production binary, downloaded toolchain, SDK, or device runtime directory is
+stored in Git.
+
+### Production build path
+
+The repository's existing build machinery was reused. The P5 wrapper is
+`scripts/ios/build-forgejo.sh`; it resolves the active iPhoneOS SDK and clang
+with `xcrun`, uses `scripts/ios/clang-wrapper`, forces `GOOS=ios`,
+`GOARCH=arm64`, `CGO_ENABLED=1`, `GOTOOLCHAIN=local`, and an iOS 12.0
+deployment target, and invokes the upstream `make backend` target. That
+target performs Forgejo's normal backend generation and builds the root
+package from `main.go`.
+
+The two CI variants are:
+
+```text
+minimal diagnostic variant: bindata timetzdata
+primary production variant: bindata timetzdata sqlite sqlite_unlock_notify
+```
+
+The minimal variant is diagnostic only. The SQLite variant is the accepted
+P5 artifact. Both compiled successfully on the final macOS runner. The
+production source was not patched, and `go.mod`/`go.sum` remain unchanged.
+
+Final build environment recorded by CI:
+
+```text
+runner: macos-15, arm64
+macOS: 15.7.9
+Xcode: 16.4
+iPhoneOS SDK: 18.5
+Apple clang: 17.0.0 (clang-1700.0.13.5)
+Go: go1.26.7 darwin/arm64
+GOOS/GOARCH: ios/arm64
+CGO_ENABLED: 1
+deployment target: iOS 12.0
+```
+
+The final CI artifact contains the pristine executable, the separate CI
+ad-hoc-signed copy, `SHA256SUMS`, and `build-info.txt`. The artifact's
+`build-info.txt` records the exact final commit, runner, SDK, tags, and
+inspection output. The separate device working copy is the only copy mutated
+by ldid. The production wrapper passes `-buildvcs=false` so the binary
+content is not changed merely by documenting the already-recorded source
+commit; `build-info.txt` remains the authoritative source-provenance record.
+
+The final artifact checksum records are:
+
+```text
+forgejo-ios-pristine  9b58986442624e3879c33cb45629f025b1462ae6460b81740b9db5435f699fd0
+forgejo-ios            477c3cf8a459c7bc1eb717a8b9c4328dd966cdf027200f044c6f615fa57238cb
+```
+
+These are the two entries in the final CI `SHA256SUMS`; both were verified
+on-device before the pristine copy was retained and the separate working copy
+was signed.
+
+### Production Mach-O and SQLite evidence
+
+The primary executable was inspected by
+`scripts/ios/inspect-forgejo-binary.sh` before CI ad-hoc signing:
+
+```text
+Mach-O 64-bit executable arm64
+LC_BUILD_VERSION platform 2 (physical iOS)
+minimum OS: 12.0
+SDK: 18.5
+```
+
+The final artifact is approximately 103 MB pristine and approximately 104 MB
+after the CI ad-hoc signature. Its dynamic dependencies are limited to the
+Apple system libraries used by the Go runtime and external linker:
+
+```text
+/usr/lib/libresolv.9.dylib
+/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+/System/Library/Frameworks/Security.framework/Security
+/usr/lib/libSystem.B.dylib
+```
+
+No Homebrew, MacPorts, simulator, macOS, or runner-local library dependency
+was found. The `sqlite` build tag compiled the bundled
+`github.com/mattn/go-sqlite3` implementation, and `sqlite_unlock_notify` was
+present in the selected tag set. The first successful device log explicitly
+reported:
+
+```text
+SQLite3 support is enabled
+Beginning ORM engine initialization.
+ORM engine initialization successful!
+```
+
+This is direct CGO/SQLite runtime evidence, not only a link-time result.
+
+### Device artifact and signing treatment
+
+The final pristine artifact, the CI ad-hoc copy, `SHA256SUMS`, and
+`build-info.txt` were transferred to a new prompt-owned directory below
+`/var/nghianguyen/forgejo-ios-p5/`. Both CI artifact entries passed
+`sha256sum -c SHA256SUMS` on the iPad. The pristine copy was retained
+unchanged. A separate working copy was made executable and signed with the
+already-installed device tool:
+
+```text
+/usr/bin/ldid -S/var/nghianguyen/forgejo-ios/scripts/ios/device-entitlements-no-container.plist forgejo-ios
+```
+
+The device implementation is Procursus `ldid 2.1.5-procursus6`. Inspection
+showed the working copy contains only the empirically required entitlement:
+
+```text
+com.apple.private.security.no-container
+```
+
+No `platform-application` or `com.apple.private.skip-library-validation`
+entitlement was added. The signed working copy remained a Mach-O arm64
+physical-iOS executable. Its checksum is intentionally kept separate from
+the pristine artifact checksum because signing changes the file.
+
+### CLI startup evidence
+
+The accepted device command environment was:
+
+```text
+DYLD_INSERT_LIBRARIES=/usr/lib/base_hook.dylib
+GOMAXPROCS=1
+```
+
+With that environment, the final production binary passed both non-mutating
+CLI gates:
+
+- `forgejo --version`: exit `0`, empty stderr, and stdout identifying the
+  P5 Forgejo build, Go 1.26.7, and `bindata`, `timetzdata`, `sqlite`, and
+  `sqlite_unlock_notify`.
+- `forgejo --help`: exit `0`, empty stderr, and the expected root command
+  list including `web`, `admin`, `migrate`, `doctor`, `actions`, and
+  `forgejo-cli`.
+
+The `GOMAXPROCS=1` requirement is a new, real-device production finding.
+Without it, the same signed binary reaches Go/Forgejo initialization and
+exits with `SIGILL` (shell exit `2`) before printing version output. The
+faulting PC is in Go 1.26.7's `runtime.procyieldAsm`; the stack shows the
+failure while `github.com/go-enry/go-enry/v2` initializes its regexp data.
+This is distinct from the P2/P3 pre-startup AMFI kill. The small P4 probes
+completed before exercising this longer initialization/GC path, so their
+success did not disprove this production workload-specific runtime issue.
+
+`GOMAXPROCS=1` is an evidence-backed launch requirement for this prompt, not
+a claim that the Go runtime has been repaired. No Go toolchain or runtime
+source was modified. Prompt 006 should decide whether to retain a documented
+single-process launcher or investigate a narrowly scoped runtime fix.
+
+### Isolated SQLite-backed server
+
+The server test used a new configuration at the prompt-owned runtime path and
+did not reuse existing Forgejo or Git service data. The configuration was
+derived from the repository's own Docker app.ini conventions and set:
+
+```text
+WORK_PATH:        /var/nghianguyen/forgejo-ios-p5/<final-sha>/runtime
+config:           .../runtime/custom/conf/app.ini
+database:         .../runtime/data/forgejo.db
+repository root:  .../runtime/repositories
+application data: .../runtime/data
+logs:             .../runtime/log
+bind address:     127.0.0.1
+port:             39123
+database:         sqlite3, automatic migration enabled
+SSH:              disabled
+```
+
+With the signed working copy and `GOMAXPROCS=1`, Forgejo:
+
+1. created the isolated storage directories and files;
+2. ran `git.InitFull`, located and executed the device's existing
+   `/usr/bin/git`, and logged `Git version: 2.39.1`;
+3. enabled the bundled SQLite support and initialized the ORM/migrations;
+4. created `forgejo.db`, `forgejo.db-wal`, and `forgejo.db-shm`;
+5. reached `Listen: http://127.0.0.1:39123`;
+6. returned HTTP `200 OK` from an on-device curl request to `/`, with the
+   Forgejo HTML title/body identifying the test instance; and
+7. handled SIGTERM, closed the listener, closed the issue indexer, and
+   reported `Forgejo Web Finished`.
+
+The first clean shutdown left no Forgejo process and no listening socket. One
+restart with the same SQLite data directory again initialized the database,
+returned HTTP `200`, and shut down cleanly. The only remaining socket entries
+were expected TCP `TIME_WAIT` records from the local HTTP requests. No
+orphaned Forgejo process was left running.
+
+### Evidence classification and Prompt 006 boundary
+
+**PROVEN**
+
+- Forgejo v15.0.9 production source builds as a physical iOS arm64 Mach-O
+  with Go 1.26.7, CGO, bundled SQLite, and `sqlite_unlock_notify`.
+- The final artifact has iOS platform 2/minimum iOS 12.0 metadata and no
+  unintended host-library dependency.
+- The P4 no-container device signing treatment accepts the real production
+  executable.
+- The accepted binary starts its CLI, opens an isolated SQLite database,
+  executes the existing Git binary, serves loopback HTTP, handles SIGTERM,
+  and restarts once under `GOMAXPROCS=1`.
+
+**INFERRED**
+
+- The `GOMAXPROCS=1` requirement is probably an A7/Go 1.26 runtime
+  instruction or scheduling-path compatibility issue, because the same
+  signed binary faults at `runtime.procyieldAsm` only with the default
+  multiprocessor setting and succeeds with one process.
+- The successful web response establishes the core Forgejo/SQLite/Git path,
+  but not every background service or repository operation.
+
+**NOT YET TESTED**
+
+- Git clone/push, Forgejo repository creation, SSH Git, LFS, Actions,
+  packages, webhooks, mail, mirrors, and load/durability behavior.
+- Default multi-processor Go 1.26.7 Forgejo startup without a launcher
+  workaround.
+- A patched Go runtime or an iOS-specific Forgejo launcher implementation.
+
+The recommended Prompt 006 work is to make the `GOMAXPROCS=1` launch policy
+explicit and reproducible, then evaluate the smallest safe path toward
+restoring multi-processor behavior on A7. Keep the production Go requirement
+at Go 1.26.7 until that evidence exists; do not backport Forgejo to Go 1.20
+based on the earlier P2/P3 signing failure.
