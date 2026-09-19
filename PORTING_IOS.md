@@ -1361,3 +1361,237 @@ Recommended Prompt 007: build an isolated Go 1.26.7 experimental toolchain that
 changes only the iOS/arm64 `procyieldAsm` fallback away from `CNTVCT_EL0`, then
 validate the bounded Go scheduler probe and production Forgejo with
 `GOMAXPROCS=2` on the A7 device before considering that runtime path supported.
+
+## Prompt 007 A7-compatible Go 1.26.7 runtime
+
+Prompt 007 continues from the P6 commit `57d8464d3305a87915b35c42f234ef29f17bfa44`.
+The purpose of this section is to record a version-specific, isolated Go
+runtime experiment. It does not downgrade Forgejo, change Forgejo production
+packages, change `go.mod`/`go.sum`, redesign the scheduler, or alter atomic
+operations.
+
+### Exact source and compatibility reference
+
+The P7 builder retrieves the official Go 1.26.7 source distribution from
+`https://go.dev/dl/go1.26.7.src.tar.gz` and rejects any archive or source tree
+whose identity does not match the recorded guards:
+
+```text
+archive SHA-256: 0ed24eac755105085b89fe9cabc2742b91a0ad7b94b59d3ad364918ebc8956ad
+VERSION SHA-256: 89f723ad27054a2ccc7c22f2a974886f3077f64623a231297fcea2e74a73a782
+src/runtime/asm_arm64.s SHA-256: c2d54a06306c90a1d6ab666101c563056578a84c9b11f50575874af9c54b2133
+src/runtime/stubs.go SHA-256: 0572c8b87cdbd975e8fddc5e8e84240d6397445589641035f0ce95e6676ee90e
+```
+
+The source was reproduced as `go1.26.7`, with release metadata timestamp
+`2026-08-18T21:44:21Z`. The Go 1.20.14 source was also retrieved separately
+as a compatibility reference. Its `runtime.procyield` implementation is:
+
+```text
+MOVWU cycles+0(FP), R0
+again:
+    YIELD
+    SUBW $1, R0
+    CBNZ R0, again
+    RET
+```
+
+That older loop is bounded by the `cycles` argument and uses no counter-timer
+register. The Go 1.26.7 callers pass the same runtime backoff argument to
+`procyieldAsm`, while Go 1.26.7's stock arm64 implementation interprets it as
+a short nanosecond delay and reads `CNTVCT_EL0`. The P7 choice is therefore a
+conservative instruction-level fallback, not a copy of unrelated Go 1.20
+runtime code.
+
+### Narrow runtime patch
+
+The project-side patch is:
+
+```text
+scripts/ios/go-runtime/go1.26.7-a7-procyield.patch
+```
+
+It changes only the `runtime·procyieldAsm` body in the exact Go 1.26.7
+`src/runtime/asm_arm64.s`. The assembler's `GOOS_ios` preprocessor branch
+selects a bounded `YIELD`/`SUBW`/`CBNZ` loop for `GOOS=ios` and `GOARCH=arm64`.
+The existing timer-based body, including `CNTFRQ_EL0` and `CNTVCT_EL0`, remains
+in the inverse branch for other ARM64 targets. The patch SHA-256 in this
+checkout is:
+
+```text
+b9b077f8e5a3408f08b49601a792ba7e32f6c0930302c98a4686e13a74f0bbfc
+```
+
+The reproducible builder is:
+
+```text
+scripts/ios/go-runtime/build-go-a7.sh
+```
+
+It recreates only `build/ios/go1.26.7-a7/goroot`, verifies the official
+archive and source hashes, applies the patch with a fail-closed clean-apply
+check, builds with a separate bootstrap Go, and writes
+`build/ios/go1.26.7-a7/provenance.env`. The generated GOROOT, `pkg/tool`,
+compiled packages, downloaded archive, and SDK remain ignored build artifacts;
+none are vendored or committed.
+
+### Host assembly validation
+
+The isolated toolchain was built on Linux using bootstrap
+`go1.27.1-X:nodwarf5` and reports:
+
+```text
+go version go1.26.7 linux/amd64
+```
+
+The selected assembly function was assembled twice with the isolated Go
+assembler. The `GOOS=ios`, `GOARCH=arm64` object contains only the argument
+load, zero check, `YIELD`, bounded decrement/branch, and return; it contains no
+`MRS` instruction and no `CNTVCT_EL0`. The Linux-selected object retains the
+stock `CNTFRQ_EL0`/`CNTVCT_EL0` timer reads. This is source/object selection
+evidence; it is not a substitute for the final iPhoneOS CGO link or physical
+device execution.
+
+The host cannot link an iOS executable because Go requires external CGO
+linking for `ios/arm64` and this Linux environment has no iPhoneOS SDK. The
+real iPhoneOS probe and Forgejo binary are therefore built by the dedicated
+macOS workflow:
+
+```text
+.github/workflows/ios-forgejo-a7-runtime.yml
+```
+
+The existing `ios-cgo-probe.yml` remains the stock Go 1.26.7/Go 1.20.14
+runtime matrix and continues to document the unpatched A7 failure. The new
+workflow separately builds the A7-compatible toolchain, checks the scheduler
+probe's symbolized `runtime.procyieldAsm` object dump, checks the final
+stripped Forgejo artifact for the unique six-instruction fallback signature
+inside `__text`, builds the SQLite production artifact, records provenance,
+and runs a normal stock-Go Linux regression job. The final Forgejo binary is
+built with the established `-s -w` flags, so its Go symbol table is absent;
+the raw signature check is deliberately fail-closed and records the file and
+VM offsets of the selected body rather than pretending a symbolized dump is
+available.
+
+### P7 validation evidence and acceptance boundary
+
+The following evidence was collected from the dedicated A7-compatible
+workflow and its physical-device artifact. The final completion handoff
+records the final workflow run and commit SHA; generated toolchains, device
+data, and signed working copies remain outside Git.
+
+**PROVEN**
+
+- The exact Go 1.26.7 source and all required archive/source hashes are
+  verified before patching. The patch hash is
+  `b9b077f8e5a3408f08b49601a792ba7e32f6c0930302c98a4686e13a74f0bbfc`.
+- The Go 1.20.14 ARM64 reference loop uses `YIELD`, `SUBW`, and `CBNZ` and
+  does not read `CNTVCT_EL0`.
+- The project patch changes only the `GOOS=ios`, `GOARCH=arm64`
+  `runtime.procyieldAsm` branch. The stock timer-based implementation remains
+  in the inverse branch for other ARM64 targets.
+- The isolated Go 1.26.7 toolchain builds successfully on Linux and macOS
+  using a separate bootstrap Go. The host/system Go and the runner-installed
+  bootstrap Go are not modified in place.
+- The selected iOS runtime object contains `MOVWU`, `CBZ`, `YIELD`, `SUBW`,
+  `CBNZ`, and `RET`, with no `MRS` or `CNTVCT_EL0`. The non-iOS assembly
+  selection retains the stock timer reads.
+- The final production artifact is a physical `Mach-O 64-bit executable
+  arm64`, has iOS platform 2/minimum iOS 12.0 metadata, and links only the
+  expected Apple system libraries. Its existing stripped build has one
+  unique exact fallback byte signature in `__text`:
+
+  ```text
+  file __text offset: 16384
+  fallback file offset: 593920
+  fallback VM address: 0x100091000
+  body: MOVWU, CBZ, YIELD, SUBW, CBNZ, RET
+  CNTVCT_EL0: absent from selected fallback body
+  ```
+
+- The stock Go 1.26.7 control remained documented and reproduced the known
+  failure on the same iPad: P=1 passed and P=2 reached
+  `runtime.procyieldAsm +0x2c`, `asm_arm64.s:1126`, at
+  `MRS CNTVCT_EL0`. The prior P6 matrix remains 3/3 PASS for P=1 and 3/3
+  SIGILL for P=2.
+- The patched minimal scheduler probe passed P=1 5/5 and P=2 10/10 on the
+  iPad. Every run exited 0. The P=2 representative output identified
+  `go1.26.7`, `NUM_CPU=2`, `GOMAXPROCS=2`, `COMPLETED=16`, and
+  `RESULT=PASS`.
+- The bounded extended probe ran for 30 seconds at P=2 and recorded 0
+  failures. Repeated final-artifact runs completed 90-94 probe iterations;
+  that count is scheduler-timing dependent, not an acceptance threshold. This
+  is a stability check, not a thermal or performance qualification.
+- The patched Forgejo artifact reported:
+
+  ```text
+  forgejo version 15.0.9 (release name 15.0.9) built with GNU Make 3.81,
+  go1.26.7 : bindata, timetzdata, sqlite, sqlite_unlock_notify
+  ```
+
+  Both `--version` and `--help` exited 0 at P=1 and P=2. The launcher logged
+  `policy=preserve-explicit`, proving that the explicit P=2 acceptance run
+  did not accidentally use the P6 single-process fallback.
+- Forgejo server validation used the isolated prompt-owned device directory
+  and port `127.0.0.1:39127` for the final amended commit. P=1 passed two starts, and P=2 passed two
+  starts. Each run returned HTTP 200, logged Git `2.39.1`, reported SQLite3
+  support and successful ORM initialization, reached the expected listener,
+  created `forgejo.db`, `forgejo.db-wal`, and `forgejo.db-shm`, and handled
+  SIGTERM with wait status 0 and `Forgejo Web Finished`.
+- The P=2 first run also handled eight bounded concurrent loopback GET
+  requests with all eight responses returning HTTP 200. No Forgejo process
+  was left running after any shutdown or restart.
+- The dedicated macOS A7 workflow passed its isolated toolchain build,
+  patched scheduler-probe build/inspection, final Forgejo build/inspection,
+  provenance/checksum generation, and artifact upload. Its parallel Linux
+  job passed `make build TAGS='bindata timetzdata sqlite sqlite_unlock_notify'`
+  using normal stock Go 1.26.7.
+- The final completion artifact was built from commit
+  `1a81ea367219ecae035d3dc79908c4e0bcbb269f` in workflow run
+  `35445809109`; the final physical-device acceptance used the matching
+  artifact and the isolated directory
+  `/var/nghianguyen/forgejo-ios-p7/1a81ea367219ecae035d3dc79908c4e0bcbb269f`.
+- The existing stock iOS matrix remains separate from the A7-compatible
+  production workflow. It continues to cover native C, Go 1.20, Go 1.20
+  CGO, stock Go 1.26, stock Go 1.26 CGO, ARM64 instruction probes, and the
+  known stock multi-P failure characterization.
+
+**EXPERIMENTAL / STAGED**
+
+- The `YIELD` fallback is now accepted for the tested Forgejo workload on
+  `iPad4,4`, iOS 12.5.7, Darwin 18.7.0, with P=2. It has not been qualified
+  for sustained production load, thermal behavior, battery impact, or every
+  background worker and repository operation.
+- The launcher policy remains conservative: absent an explicit override,
+  `iPad4,4`, `iPad4,5`, and `iPad4,6` on Darwin `18.*` still receive
+  `GOMAXPROCS=1`. An explicit `GOMAXPROCS=2` is supported only when the
+  binary is known to carry the P7-compatible runtime provenance. This avoids
+  launching a stock Go 1.26.7 binary at P=2.
+- The binary/build provenance identifies the runtime as
+  `P7_RUNTIME=go1.26.7-a7`, records the exact source guards and patch hash,
+  and is emitted in CI build metadata. The user-facing Forgejo version was
+  not changed.
+
+**NOT TESTED**
+
+- Other iOS releases, non-A7 SoCs, or the sibling A7 identifiers
+  `iPad4,5`/`iPad4,6`.
+- Long-duration soak, thermal/battery qualification, large repository
+  operations, Git push/receive-pack workflows, graceful restart, and all
+  optional Forgejo services.
+- A future Go release. The builder intentionally rejects source revisions
+  other than the exact guarded Go 1.26.7 source and must be revalidated before
+  any Go 1.26.8 or Go 1.27 use.
+
+P7 is complete only for the narrow tested compatibility boundary above. If a
+future device or workload produces a hang, panic, scheduler corruption, or
+runtime fault, revert that deployment to the existing `GOMAXPROCS=1` policy
+and treat the fallback as unqualified for that boundary.
+
+### Prompt 008 recommendation
+
+Keep the P7 runtime/toolchain unchanged while extending evidence to the two
+sibling A7 identifiers, one later iOS release if available, longer but
+bounded service and repository exercises, and explicit provenance-aware
+launcher selection. Do not broaden the patch to other ARM64 operating systems
+or future Go versions without a new source review and device matrix.

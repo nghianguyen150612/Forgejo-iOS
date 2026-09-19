@@ -1,0 +1,161 @@
+name: iOS Forgejo A7-compatible runtime build
+
+on:
+  push:
+    branches:
+      - ios
+    paths:
+      - '.github/workflows/ios-forgejo-a7-runtime.yml'
+      - 'Makefile'
+      - 'PORTING_IOS.md'
+      - 'go.mod'
+      - 'go.sum'
+      - 'main.go'
+      - 'cmd/**'
+      - 'modules/**'
+      - 'models/**'
+      - 'routers/**'
+      - 'services/**'
+      - 'scripts/ios/**'
+      - 'tools/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forgejo-a7-runtime:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      GOOS: ios
+      GOARCH: arm64
+      CGO_ENABLED: '1'
+      GOTOOLCHAIN: local
+      IOS_DEPLOYMENT_TARGET: '12.0'
+      FORGEJO_VERSION: '15.0.9'
+      FORGEJO_VERSION_API: '15.0.9+gitea-1.22.0'
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install bootstrap Go 1.27.1
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache: false
+
+      - name: Build and verify isolated Go 1.26.7 A7 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ios/go-runtime/build-go-a7.sh
+          mkdir -p build/ios
+          scripts/ios/go-runtime/build-go-a7.sh build/ios/go1.26.7-a7 2>&1 | tee build/ios/go1.26.7-a7-build.log
+          a7_goroot="$(awk -F= '$1 == "GOROOT" { print substr($0, index($0, "=") + 1) }' build/ios/go1.26.7-a7/provenance.env)"
+          [[ -n "$a7_goroot" && -x "$a7_goroot/bin/go" ]]
+          printf 'GOROOT=%s\n' "$a7_goroot" >>"$GITHUB_ENV"
+          printf '%s/bin\n' "$a7_goroot" >>"$GITHUB_PATH"
+          "$a7_goroot/bin/go" version | tee build/ios/go1.26.7-a7-go-version.txt
+          grep -F 'go1.26.7' build/ios/go1.26.7-a7-go-version.txt
+
+      - name: Build patched scheduler probe and inspect runtime path
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ios/build-runtime-probe.sh scripts/ios/inspect-runtime-probes.sh
+          scripts/ios/build-runtime-probe.sh build/ios/go126-a7-multip-probe tools/ios-runtime-probes/go-multip/main.go 2>&1 | tee build/ios/go126-a7-multip-build.log
+          go version | tee build/ios/go126-a7-go-version.txt
+          go tool objdump -s 'runtime.procyieldAsm' build/ios/go126-a7-multip-probe | tee build/ios/go126-a7-procyield-objdump.txt
+          if grep -En 'CNTVCT_EL0|MRS' build/ios/go126-a7-procyield-objdump.txt; then
+            printf '%s\n' 'A7 runtime validation failed: MRS remains in selected iOS procyieldAsm' >&2
+            exit 1
+          fi
+          grep -En 'YIELD|SUBW|CBNZ' build/ios/go126-a7-procyield-objdump.txt
+
+      - name: Build patched Forgejo SQLite production artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ios/build-forgejo.sh scripts/ios/inspect-forgejo-binary.sh scripts/ios/inspect-a7-procyield-binary.sh
+          scripts/ios/build-forgejo.sh build/ios/forgejo-ios-a7-pristine 'bindata timetzdata sqlite sqlite_unlock_notify' 2>&1 | tee build/ios/forgejo-ios-a7-build.log
+          scripts/ios/inspect-forgejo-binary.sh build/ios/forgejo-ios-a7-pristine build/ios/forgejo-ios-a7-inspection.txt
+          scripts/ios/inspect-a7-procyield-binary.sh build/ios/forgejo-ios-a7-pristine build/ios/forgejo-ios-a7-procyield-objdump.txt
+          cp build/ios/forgejo-ios-a7-pristine build/ios/forgejo-ios-a7
+          codesign --force --sign - --timestamp=none build/ios/forgejo-ios-a7
+          codesign --verify --verbose=4 build/ios/forgejo-ios-a7
+          codesign --display --verbose=4 build/ios/forgejo-ios-a7 >build/ios/forgejo-ios-a7-codesign.txt 2>&1
+
+      - name: Write A7 runtime provenance and checksums
+        shell: bash
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            printf 'Git commit='; git rev-parse HEAD
+            printf 'Git describe='; git describe --exclude '*-test' --tags --always
+            printf 'Bootstrap Go='; go version 2>&1 || true
+            printf '%s\n' '--- A7 toolchain provenance ---'
+            cat build/ios/go1.26.7-a7/provenance.env 2>/dev/null || true
+            printf '%s\n' '--- patched runtime procyield ---'
+            cat build/ios/go126-a7-procyield-objdump.txt 2>/dev/null || true
+            printf '%s\n' '--- Forgejo runtime procyield ---'
+            cat build/ios/forgejo-ios-a7-procyield-objdump.txt 2>/dev/null || true
+            printf '%s\n' '--- Forgejo inspection ---'
+            cat build/ios/forgejo-ios-a7-inspection.txt 2>/dev/null || true
+            printf '%s\n' '--- code signature ---'
+            cat build/ios/forgejo-ios-a7-codesign.txt 2>/dev/null || true
+          } >build/ios/forgejo-ios-a7-build-info.txt
+          : >build/ios/forgejo-ios-a7-SHA256SUMS
+          for artifact in forgejo-ios-a7-pristine forgejo-ios-a7 go126-a7-multip-probe; do
+            if [[ -f "build/ios/$artifact" ]]; then
+              (cd build/ios && shasum -a 256 "$artifact") >>build/ios/forgejo-ios-a7-SHA256SUMS
+            fi
+          done
+          cat build/ios/forgejo-ios-a7-SHA256SUMS
+
+      - name: Upload A7-compatible production artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-forgejo-a7-runtime
+          if-no-files-found: error
+          path: |
+            build/ios/forgejo-ios-a7-pristine
+            build/ios/forgejo-ios-a7
+            build/ios/go126-a7-multip-probe
+            scripts/ios/device-entitlements-no-container.plist
+            build/ios/forgejo-ios-a7-SHA256SUMS
+            build/ios/forgejo-ios-a7-build-info.txt
+
+      - name: Upload A7-compatible diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-forgejo-a7-runtime-diagnostics
+          if-no-files-found: warn
+          path: |
+            build/ios/**
+
+  linux-stock-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install stock Go 1.26.7
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.7'
+          cache: false
+
+      - name: Run Linux Forgejo regression with stock Go
+        shell: bash
+        run: |
+          set -euo pipefail
+          go version
+          GOTOOLCHAIN=local make build TAGS='bindata timetzdata sqlite sqlite_unlock_notify'
