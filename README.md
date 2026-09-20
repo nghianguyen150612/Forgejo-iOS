@@ -1,66 +1,155 @@
-<div align="center">
-    <img src="./assets/logo.svg" alt="" width="192" align="center" />
-    <h1 align="center">Welcome to Forgejo</h1>
-</div>
+# Forgejo iOS
 
-Hi there! Tired of big platforms playing monopoly?
-Providing Git hosting for your project, friends, company or community?
-**Forgejo** (/for'd&#865;ʒe.jo/ inspired by forĝejo – the Esperanto word for *forge*) has you covered with its intuitive interface,
-light and easy hosting and a lot of built-in functionality.
+[![iOS Forgejo production build](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-production.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-production.yml)
+[![iOS A7 runtime build](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml)
+[![Release](https://img.shields.io/github/v/tag/nghianguyen150612/forgejo-ios?filter=v1.0.0-ios&label=release)](https://github.com/nghianguyen150612/forgejo-ios/releases/tag/v1.0.0-ios)
+[![License](https://img.shields.io/github/license/nghianguyen150612/forgejo-ios)](LICENSE)
 
-Forgejo was [created in 2022](https://forgejo.org/2022-12-15-hello-forgejo/)
-because we think that the project should be owned by an independent community.
-If you second that, then Forgejo is for you!
-Our promise: **Independent Free/Libre Software forever!**
+Forgejo iOS is a narrowly qualified port of [Forgejo](https://forgejo.org/) that runs natively on a jailbroken iPad.
 
-## What does Forgejo offer?
+[Tiếng Việt](README.vi.md)
 
-If you like any of the following, Forgejo is literally meant for you:
+## Overview
 
-- Lightweight: Forgejo can easily be hosted on nearly **every machine**.
-  Running on a Raspberry? Small cloud instance? No problem!
-- Project management: Besides Git hosting, Forgejo offers issues,
-  pull requests, wikis, kanban boards and much more to **coordinate with your team**.
-- Publishing: Have something to share? Use **releases** to host your software for download,
-  or use the **package registry** to publish it for docker, npm and many other package managers.
-- Customizable: Want to change your look? Change some settings?
-  There are many **config switches** to make Forgejo work exactly like you want.
-- Powerful: Organizations & team permissions, CI integration, Code Search, LDAP, OAuth and much more.
-  If you have **advanced needs**, Forgejo has you covered.
-- Privacy: From update checker to default settings: Forgejo is built to be **privacy first** for you and your crew.
-- Federation: (WIP) We are actively working to connect software forges with each other through **ActivityPub**,
-  and create a collaborative network of personal instances.
+Forgejo iOS packages Forgejo `15.0.9` as a physical iOS `arm64` binary with an Apple A7-compatible Go runtime, a manual service launcher, and documented backup and security procedures.
 
-## Learn more
+The project is intended for operators and developers who want a small self-hosted Git server on the validated iOS target. It keeps Forgejo's web interface, Git repository workflow, and SQLite-backed deployment model while documenting the extra runtime, signing, and jailbreak boundaries needed on iOS.
 
-Dive into the [documentation](https://forgejo.org/docs/latest/), subscribe to releases and blog post on [our website](https://forgejo.org), <a href="https://floss.social/@forgejo" rel="me">find us on the Fediverse</a> or hop into [our Matrix room](https://matrix.to/#/#forgejo-chat:matrix.org) if you have any questions or want to get involved.
+This is not an upstream Forgejo support statement and it does not expand Forgejo's general platform support matrix.
 
-## Forgejo iOS release candidate
+## Features
 
-This `ios` branch contains a narrowly qualified native iOS port. It is not a
-general Forgejo support statement and does not change the upstream support
-matrix.
+- ✓ Native iOS `arm64` build for physical devices.
+- ✓ Forgejo web interface served from the iPad.
+- ✓ Git repository hosting through Forgejo's HTTP workflow.
+- ✓ SQLite backend for the qualified single-device deployment.
+- ✓ Backup and restore workflow with integrity checks.
+- ✓ Manual service launcher for start, status, restart, and stop.
+- ✓ Apple A7 runtime compatibility through `go1.26.7-a7`.
+- ✓ Release metadata, checksum, provenance, and security boundary documentation.
 
-The qualified target is a rootful, jailbroken `iPad4,4` (iPad mini 2) with an
-Apple A7 CPU, iOS `12.5.7`, and Darwin `18.7.0`. The release candidate is
-Forgejo `15.0.9`, built for physical `ios/arm64` with the
-`bindata timetzdata sqlite sqlite_unlock_notify` tags and the isolated
-`go1.26.7-a7` runtime.
+## Supported Device
 
-For the complete device installation and verification procedure, see
-[`PORTING_IOS.md`](PORTING_IOS.md). Keep the runtime under a dedicated
-owner-only tree and use the strict [backup and restore procedure](docs/BACKUP.md)
-before moving data. The [security and deployment boundary](docs/SECURITY.md)
-documents signing, permissions, network exposure, secrets, and the limits of
-the jailbreak model. The current release-candidate metadata and checksum are
-in [`RELEASE.md`](RELEASE.md).
+The v1.0.0 release is qualified only for this platform:
+
+```text
+Device:    iPad4,4
+CPU:       Apple A7
+OS:        iOS 12.5.7
+Jailbreak: Rootful Amethyst
+Forgejo:   15.0.9
+Runtime:   go1.26.7-a7
+```
+
+Other iOS devices, iOS versions, jailbreak layouts, CPUs, and background-service models require their own validation before use.
+
+## Quick Start
+
+1. Obtain the `v1.0.0-ios` release artifact and metadata.
+2. Verify `SHA256SUMS`, then transfer the executable to the jailbroken iPad.
+3. Configure an owner-only runtime tree with loopback HTTP and SQLite paths.
+4. Start Forgejo with `scripts/ios/run-forgejo.sh` and access it at the configured loopback URL.
+
+## Installation
+
+Start with the release bundle described in [`RELEASE.md`](RELEASE.md). The bundle contains the iOS executable, `build-info.txt`, and `SHA256SUMS`.
+
+1. Obtain the `v1.0.0-ios` release artifact.
+2. Verify the artifact before transfer:
+
+   ```sh
+   sha256sum -c SHA256SUMS
+   ```
+
+3. Copy the executable and support scripts to an owner-only directory on the jailbroken iPad.
+4. Sign the device-side working copy with `ldid` and the documented no-container entitlement.
+5. Create `custom/conf/app.ini`, `data/`, `repositories/`, and `logs/` inside a dedicated runtime root.
+6. Keep configuration, database files, launcher state, and logs owner-only.
+
+See [`docs/INSTALL.md`](docs/INSTALL.md) for the complete operator-focused installation guide.
+
+## Usage
+
+Start Forgejo with the launcher and an explicit configuration path:
+
+```sh
+export FORGEJO_IOS_BINARY=/var/nghianguyen/forgejo-ios/<release>/bin/forgejo-ios
+export FORGEJO_IOS_SERVICE_DIR=/var/nghianguyen/forgejo-ios/<release>/runtime
+export FORGEJO_IOS_DEVICE_MODEL=iPad4,4
+export FORGEJO_IOS_DARWIN_RELEASE=18.7.0
+
+scripts/ios/run-forgejo.sh start "$FORGEJO_IOS_BINARY" \
+  --config "$FORGEJO_IOS_SERVICE_DIR/custom/conf/app.ini"
+```
+
+Then verify the service locally on the iPad:
+
+```sh
+scripts/ios/run-forgejo.sh status "$FORGEJO_IOS_BINARY"
+curl --fail http://127.0.0.1:<port>/
+sqlite3 "$FORGEJO_IOS_SERVICE_DIR/data/forgejo.db" 'PRAGMA integrity_check;'
+```
+
+Stop the service before backup, restore, upgrade testing, or filesystem maintenance:
+
+```sh
+scripts/ios/run-forgejo.sh stop "$FORGEJO_IOS_BINARY"
+```
+
+## Architecture
+
+Forgejo iOS keeps the upstream Forgejo application model and adds a small iOS deployment layer around the build, runtime, launcher, and validation process.
+
+```text
+Forgejo
+   |
+Go runtime
+   |
+A7 compatibility layer
+   |
+iOS launcher
+   |
+Jailbroken iPad
+```
+
+The qualified runtime is built from Go `1.26.7` with a narrow iOS `arm64` A7 compatibility patch for `runtime.procyieldAsm`. The release uses `GOOS=ios`, `GOARCH=arm64`, `CGO_ENABLED=1`, physical iOS Mach-O output, SQLite build tags, and explicit device-side signing.
+
+Detailed porting evidence is recorded in [`PORTING_IOS.md`](PORTING_IOS.md). Maintenance policy is documented in [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md).
+
+## Backup
+
+Use the documented stopped-files backup flow before moving data, restoring an instance, or testing a new release. The backup process verifies SQLite integrity and repository object health, but it is not an encryption tool.
+
+Read [`docs/BACKUP.md`](docs/BACKUP.md) before operating on persistent data.
+
+## Security
+
+The validated deployment defaults to loopback HTTP and owner-only runtime files. Do not publish private keys, credentials, runtime directories, databases, logs, cookies, or backup archives.
+
+Read [`docs/SECURITY.md`](docs/SECURITY.md) for the security boundary, supported network posture, signing notes, permission expectations, and unsupported exposure paths.
+
+## Limitations
+
+- Manual launcher only; automatic boot is not guaranteed.
+- Rootful jailbreak target only.
+- Loopback HTTP is the default and only qualified listener posture.
+- Other devices, iOS versions, jailbreaks, and CPUs require new testing.
+- The A7 runtime evidence is bounded validation, not thermal, battery, capacity, or indefinite-soak qualification.
+- Optional Forgejo services and external renderers remain deployment-specific.
+
+## Development
+
+Development work should preserve the release boundary unless a new maintenance or upgrade cycle is explicitly opened.
+
+- Public documentation starts in [`docs/README.md`](docs/README.md).
+- Installation details are in [`docs/INSTALL.md`](docs/INSTALL.md).
+- Build and validation notes are in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+- The frozen v1.0.0 release metadata is in [`CHANGELOG.md`](CHANGELOG.md) and [`RELEASE.md`](RELEASE.md).
+
+Contributions must not include runtime data, logs, backups, secrets, private keys, or device-local databases.
 
 ## License
 
-Forgejo is distributed under the terms of the [GPL version 3.0](LICENSE) or any later version.
+Forgejo is distributed under the terms of the [GNU General Public License version 3.0](LICENSE) or any later version. Forgejo versions before v9.0 were distributed under the MIT license.
 
-The agreement for this license [was documented in June 2023](https://codeberg.org/forgejo/governance/pulls/24) and implemented during the development of Forgejo v9.0. All Forgejo versions before v9.0 are distributed under the MIT license.
-
-## Get involved
-
-If you are interested in making Forgejo better, either by reporting a bug or by changing the governance, please [take a look at the contribution guide](CONTRIBUTING.md).
+For upstream contribution guidance, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
