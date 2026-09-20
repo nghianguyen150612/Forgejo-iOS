@@ -18,6 +18,7 @@ on:
       - 'services/**'
       - 'scripts/ios/**'
       - 'tools/**'
+      - 'docs/BACKUP.md'
       - 'docs/PERFORMANCE.md'
   workflow_dispatch:
 
@@ -152,6 +153,58 @@ jobs:
             printf '%s\n' 'launcher logs contain credential-like text' >&2
             exit 1
           fi
+
+      - name: Validate isolated backup and restore workflow
+        shell: bash
+        if: success()
+        run: |
+          set -euo pipefail
+          fixture_root="$(mktemp -d "$RUNNER_TEMP/forgejo-backup.XXXXXX")"
+          trap 'rm -rf "$fixture_root"' EXIT
+          runtime="$fixture_root/runtime"
+          backup="$fixture_root/backup"
+          restored="$fixture_root/restored"
+          mkdir -p "$runtime/custom/conf" "$runtime/data" "$runtime/repositories/alice"
+          printf '%s\n' '[database]' 'DB_TYPE = sqlite3' 'PASSWORD = p12-secret' >"$runtime/custom/conf/app.ini"
+          sqlite3 "$runtime/data/forgejo.db" "CREATE TABLE p12(k TEXT PRIMARY KEY, v TEXT); INSERT INTO p12 VALUES('user','fixture');"
+          work="$fixture_root/work"
+          git init -q "$work"
+          git -C "$work" config user.email p12@example.invalid
+          git -C "$work" config user.name P12
+          printf '%s\n' 'fixture' >"$work/README"
+          git -C "$work" add README
+          git -C "$work" commit -qm initial
+          git clone -q --bare "$work" "$runtime/repositories/alice/demo.git"
+          export FORGEJO_IOS_VERSION="$FORGEJO_VERSION"
+          export FORGEJO_IOS_GIT_COMMIT="$GITHUB_SHA"
+          export FORGEJO_IOS_RUNTIME_VERSION=go1.26.7-a7
+          sleep 30 &
+          service_pid=$!
+          printf '%s\n' "$service_pid" >"$runtime/forgejo.pid"
+          if scripts/ios/backup-forgejo.sh backup --source-root "$runtime" --output "$fixture_root/running-refusal" >"$fixture_root/refusal.out" 2>"$fixture_root/refusal.err"; then
+            printf '%s\n' 'backup unexpectedly accepted a live-looking PID' >&2
+            exit 1
+          fi
+          kill "$service_pid"
+          wait "$service_pid" || true
+          rm -f "$runtime/forgejo.pid"
+          scripts/ios/backup-forgejo.sh backup --source-root "$runtime" --output "$backup" >"$fixture_root/backup.out"
+          scripts/ios/backup-forgejo.sh verify "$backup"
+          scripts/ios/backup-forgejo.sh restore "$backup" --destination "$restored"
+          sqlite3 "$restored/data/forgejo.db" 'PRAGMA integrity_check;' | grep -Fx 'ok'
+          git --git-dir="$restored/repositories/alice/demo.git" fsck --full
+          test "$(stat -f '%Lp' "$backup/payload.tar" 2>/dev/null || stat -c '%a' "$backup/payload.tar")" = 600
+          test "$(stat -f '%Lp' "$backup/metadata.txt" 2>/dev/null || stat -c '%a' "$backup/metadata.txt")" = 600
+          if grep -Fq 'p12-secret' "$fixture_root/backup.out" "$fixture_root/refusal.out" "$fixture_root/refusal.err"; then
+            printf '%s\n' 'backup output exposed a configuration secret' >&2
+            exit 1
+          fi
+          mkdir "$fixture_root/.stale-backup.partial.dead"
+          if scripts/ios/backup-forgejo.sh backup --source-root "$runtime" --output "$fixture_root/stale-backup" >"$fixture_root/stale.out" 2>"$fixture_root/stale.err"; then
+            printf '%s\n' 'backup unexpectedly ignored a stale partial directory' >&2
+            exit 1
+          fi
+          test -d "$fixture_root/.stale-backup.partial.dead"
 
       - name: Write A7 runtime provenance and checksums
         shell: bash
