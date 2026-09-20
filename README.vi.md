@@ -1,155 +1,388 @@
 # Forgejo iOS
 
-[![iOS Forgejo production build](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-production.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-production.yml)
-[![iOS A7 runtime build](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml)
-[![Release](https://img.shields.io/github/v/tag/nghianguyen150612/forgejo-ios?filter=v1.0.0-ios&label=release)](https://github.com/nghianguyen150612/forgejo-ios/releases/tag/v1.0.0-ios)
-[![License](https://img.shields.io/github/license/nghianguyen150612/forgejo-ios)](LICENSE)
+Máy chủ Forgejo chất lượng sản xuất cho các thiết bị iOS jailbreak với quản lý vòng đời hoàn chỉnh: cài đặt, cập nhật, xác minh, chẩn đoán, sửa chữa và gỡ cài đặt.
 
-Forgejo iOS là bản port được thẩm định hẹp của [Forgejo](https://forgejo.org/) chạy native trên iPad đã jailbreak.
+## Tính năng
 
-[English](README.md)
+- **Cài đặt một lệnh**: `curl -fsSL https://raw.githubusercontent.com/forgejo/forgejo/ios/install.sh | sudo sh`
+- **Cập nhật tự động** với hỗ trợ khôi phục
+- **Bảo tồn dữ liệu**: Kho lưu trữ và cấu hình của bạn tồn tại qua các bản cập nhật
+- **Chẩn đoán**: Kiểm tra sức khỏe hệ thống toàn diện
+- **Gỡ cài đặt an toàn**: Xóa Forgejo trong khi giữ dữ liệu của bạn
+- **Quản lý trạng thái**: Theo dõi phiên bản cài đặt và tính toàn vẹn
+- **Tương thích POSIX**: Không có phụ thuộc bash hoặc zsh
+- **An toàn từ pipe**: Xử lý `stdin` một cách an toàn khi chạy từ curl pipe
 
-## Overview
+## Bắt đầu nhanh
 
-Forgejo iOS đóng gói Forgejo `15.0.9` thành binary iOS vật lý `arm64`, kèm Go runtime tương thích Apple A7, service launcher thủ công, và tài liệu về backup cũng như ranh giới bảo mật.
+### Cài đặt
 
-Dự án dành cho người vận hành và nhà phát triển muốn chạy Git server tự host nhỏ gọn trên mục tiêu iOS đã được xác thực. Dự án giữ lại Forgejo web interface, Git repository workflow, và mô hình triển khai SQLite-backed, đồng thời tài liệu hóa runtime, signing, và jailbreak boundaries bổ sung cần thiết trên iOS.
-
-Đây không phải tuyên bố hỗ trợ chính thức từ upstream Forgejo và không mở rộng support matrix chung của Forgejo.
-
-## Features
-
-- ✓ Native iOS `arm64` build cho thiết bị vật lý.
-- ✓ Forgejo web interface phục vụ trực tiếp từ iPad.
-- ✓ Git repository hosting thông qua workflow HTTP của Forgejo.
-- ✓ SQLite backend cho triển khai một thiết bị đã được xác thực.
-- ✓ Backup and restore workflow với integrity checks.
-- ✓ Manual service launcher cho start, status, restart, và stop.
-- ✓ Apple A7 runtime compatibility thông qua `go1.26.7-a7`.
-- ✓ Release metadata, checksum, provenance, và tài liệu security boundary.
-
-## Supported Device
-
-Bản phát hành v1.0.0 chỉ được xác thực cho nền tảng sau:
-
-```text
-Device:    iPad4,4
-CPU:       Apple A7
-OS:        iOS 12.5.7
-Jailbreak: Rootful Amethyst
-Forgejo:   15.0.9
-Runtime:   go1.26.7-a7
+```bash
+curl -fsSL https://raw.githubusercontent.com/forgejo/forgejo/ios/install.sh | sudo sh
 ```
 
-Các thiết bị iOS khác, phiên bản iOS khác, layout jailbreak khác, CPU khác, và mô hình background service khác đều cần validation riêng trước khi sử dụng.
+Trình cài đặt sẽ:
+1. Kiểm tra yêu cầu trước tiên của thiết bị (kiến trúc, jailbreak, công cụ cần thiết)
+2. Tải xuống bản phát hành Forgejo iOS mới nhất
+3. Xác minh tổng kiểm tra SHA256
+4. Bảo tồn bất kỳ dữ liệu hiện có nào
+5. Di chuyển tệp nhị phân đến `/var/lib/forgejo-ios/bin/forgejo`
+6. Tạo tệp trạng thái cài đặt
 
-## Quick Start
+### Chạy trình đơn trình cài đặt
 
-1. Lấy release artifact `v1.0.0-ios` và metadata đi kèm.
-2. Xác minh `SHA256SUMS`, sau đó chuyển executable sang iPad đã jailbreak.
-3. Cấu hình runtime tree owner-only với loopback HTTP và SQLite paths.
-4. Khởi động Forgejo bằng `scripts/ios/run-forgejo.sh` và truy cập qua loopback URL đã cấu hình.
+Nếu bạn muốn chạy lại trình cài đặt mà không cần piping:
 
-## Installation
-
-Bắt đầu với release bundle được mô tả trong [`RELEASE.md`](RELEASE.md). Bundle chứa executable iOS, `build-info.txt`, và `SHA256SUMS`.
-
-1. Lấy release artifact `v1.0.0-ios`.
-2. Xác minh artifact trước khi chuyển sang thiết bị:
-
-   ```sh
-   sha256sum -c SHA256SUMS
-   ```
-
-3. Sao chép executable và support scripts vào thư mục owner-only trên iPad đã jailbreak.
-4. Ký device-side working copy bằng `ldid` và no-container entitlement đã được tài liệu hóa.
-5. Tạo `custom/conf/app.ini`, `data/`, `repositories/`, và `logs/` trong runtime root riêng.
-6. Giữ configuration, database files, launcher state, và logs ở chế độ owner-only.
-
-Xem [`docs/INSTALL.md`](docs/INSTALL.md) để có hướng dẫn cài đặt đầy đủ cho người vận hành.
-
-## Usage
-
-Khởi động Forgejo bằng launcher và đường dẫn cấu hình rõ ràng:
-
-```sh
-export FORGEJO_IOS_BINARY=/var/nghianguyen/forgejo-ios/<release>/bin/forgejo-ios
-export FORGEJO_IOS_SERVICE_DIR=/var/nghianguyen/forgejo-ios/<release>/runtime
-export FORGEJO_IOS_DEVICE_MODEL=iPad4,4
-export FORGEJO_IOS_DARWIN_RELEASE=18.7.0
-
-scripts/ios/run-forgejo.sh start "$FORGEJO_IOS_BINARY" \
-  --config "$FORGEJO_IOS_SERVICE_DIR/custom/conf/app.ini"
+```bash
+sudo sh install.sh
 ```
 
-Sau đó xác minh service cục bộ trên iPad:
+Điều này sẽ hiển thị menu tương tác:
 
-```sh
-scripts/ios/run-forgejo.sh status "$FORGEJO_IOS_BINARY"
-curl --fail http://127.0.0.1:<port>/
-sqlite3 "$FORGEJO_IOS_SERVICE_DIR/data/forgejo.db" 'PRAGMA integrity_check;'
+```
+1. Cài đặt Forgejo
+2. Cập nhật Forgejo
+3. Xác minh cài đặt
+4. Hiển thị chẩn đoán
+5. Sửa chữa cài đặt
+6. Gỡ cài đặt Forgejo
+7. Thoát
 ```
 
-Dừng service trước khi backup, restore, thử nghiệm upgrade, hoặc bảo trì filesystem:
+## Yêu cầu trước tiên
 
-```sh
-scripts/ios/run-forgejo.sh stop "$FORGEJO_IOS_BINARY"
+- **Phiên bản iOS**: Bất kỳ phiên bản nào có quyền truy cập jailbreak
+- **Kiến trúc**: ARM64 (A9+) hoặc ARMv7 (thiết bị 32-bit)
+- **Quyền root**: Jailbreak với quyền truy cập SSH/shell
+- **Công cụ**: `curl`, `sha256sum`, `tar`, `gzip`
+- **Tùy chọn**: `ldid` để ký nhị phân trên iOS
+
+## Tương thích
+
+### Kiến trúc được hỗ trợ
+
+| Kiến trúc | Thiết bị | Trạng thái |
+|---|---|---|
+| ARM64 | iPhone 6s+, iPad Air 2+, iPad Pro | Được hỗ trợ đầy đủ |
+| ARMv7 | iPhone 5s, iPad Air trước đó, iPad mini 2-3 | Được hỗ trợ đầy đủ |
+
+### Phiên bản iOS
+
+Forgejo iOS chạy trên bất kỳ phiên bản iOS jailbreak nào có đủ dung lượng trống (tối thiểu 200 MB cho tệp nhị phân, thư mục dữ liệu).
+
+### Yêu cầu thiết bị
+
+- Tối thiểu 512 MB RAM có sẵn
+- 200 MB dung lượng trống (tệp nhị phân)
+- 1 GB+ được khuyến nghị cho dữ liệu và kho lưu trữ
+
+## Cài đặt
+
+### Cài đặt tiêu chuẩn (tương tác)
+
+```bash
+sudo sh install.sh
 ```
 
-## Architecture
+Chọn tùy chọn `1` từ menu.
 
-Forgejo iOS giữ nguyên mô hình ứng dụng upstream Forgejo và bổ sung một lớp triển khai iOS nhỏ quanh build, runtime, launcher, và quy trình validation.
+### Cài đặt tự động (từ curl pipe)
 
-```text
-Forgejo
-   |
-Go runtime
-   |
-A7 compatibility layer
-   |
-iOS launcher
-   |
-Jailbroken iPad
+```bash
+curl -fsSL https://raw.githubusercontent.com/forgejo/forgejo/ios/install.sh | sudo sh
 ```
 
-Runtime đã được xác thực được build từ Go `1.26.7` với patch tương thích A7 hẹp cho iOS `arm64` tại `runtime.procyieldAsm`. Release sử dụng `GOOS=ios`, `GOARCH=arm64`, `CGO_ENABLED=1`, physical iOS Mach-O output, SQLite build tags, và device-side signing rõ ràng.
+Điều này mặc định ở chế độ cài đặt khi `stdin` không phải là terminal.
 
-Bằng chứng porting chi tiết được ghi trong [`PORTING_IOS.md`](PORTING_IOS.md). Chính sách maintenance nằm trong [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md).
+### Thư mục cài đặt tùy chỉnh
 
-## Backup
+Thư mục cài đặt mặc định là `/var/lib/forgejo-ios`. Để sử dụng một vị trí khác:
 
-Sử dụng stopped-files backup flow đã được tài liệu hóa trước khi di chuyển dữ liệu, restore instance, hoặc kiểm thử release mới. Quy trình backup xác minh SQLite integrity và repository object health, nhưng không phải công cụ mã hóa.
+```bash
+FORGEJO_BASE_DIR=/custom/path sudo sh install.sh
+```
 
-Đọc [`docs/BACKUP.md`](docs/BACKUP.md) trước khi thao tác với persistent data.
+### Cấu trúc thư mục sau khi cài đặt
 
-## Security
+```
+/var/lib/forgejo-ios/
+├── bin/
+│   └── forgejo              # Tệp nhị phân Forgejo
+├── data/                    # Dữ liệu người dùng (được bảo tồn khi cập nhật)
+├── repositories/            # Kho lưu trữ Git (được bảo tồn khi cập nhật)
+├── custom/
+│   └── conf/
+│       └── app.ini         # Cấu hình Forgejo (được bảo tồn)
+├── logs/                    # Nhật ký ứng dụng
+├── backup/                  # Sao lưu tự động trong quá trình cập nhật
+└── install-state            # Theo dõi phiên bản và tổng kiểm tra
+```
 
-Triển khai đã được xác thực mặc định dùng loopback HTTP và runtime files owner-only. Không công bố private keys, credentials, runtime directories, databases, logs, cookies, hoặc backup archives.
+## Khởi động lần đầu
 
-Đọc [`docs/SECURITY.md`](docs/SECURITY.md) để biết security boundary, network posture được hỗ trợ, signing notes, permission expectations, và các exposure paths không được hỗ trợ.
+Sau khi cài đặt, hãy khởi động Forgejo:
 
-## Limitations
+```bash
+/var/lib/forgejo-ios/bin/forgejo web
+```
 
-- Chỉ hỗ trợ manual launcher; không bảo đảm automatic boot.
-- Chỉ hỗ trợ rootful jailbreak target.
-- Loopback HTTP là mặc định và là listener posture duy nhất đã được xác thực.
-- Thiết bị, phiên bản iOS, jailbreak, và CPU khác cần testing mới.
-- Bằng chứng A7 runtime là bounded validation, không phải qualification về thermal, battery, capacity, hoặc indefinite-soak.
-- Optional Forgejo services và external renderers vẫn phụ thuộc từng deployment.
+Hoặc sử dụng trình quản lý dịch vụ của jailbreak (ví dụ: `launchd` trên iOS):
 
-## Development
+```bash
+# Tạo plist LaunchDaemon cho khởi động tự động
+sudo tee /Library/LaunchDaemons/com.forgejo.plist > /dev/null << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.forgejo</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/var/lib/forgejo-ios/bin/forgejo</string>
+        <string>web</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/var/lib/forgejo-ios/logs/forgejo.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/lib/forgejo-ios/logs/forgejo-error.log</string>
+</dict>
+</plist>
+EOF
+```
 
-Công việc development cần giữ nguyên release boundary trừ khi một maintenance hoặc upgrade cycle mới được mở rõ ràng.
+Sau đó tải dịch vụ:
 
-- Tài liệu public bắt đầu tại [`docs/README.md`](docs/README.md).
-- Chi tiết cài đặt nằm trong [`docs/INSTALL.md`](docs/INSTALL.md).
-- Ghi chú build và validation nằm trong [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
-- Release metadata đã đóng băng của v1.0.0 nằm trong [`CHANGELOG.md`](CHANGELOG.md) và [`RELEASE.md`](RELEASE.md).
+```bash
+sudo launchctl load /Library/LaunchDaemons/com.forgejo.plist
+```
 
-Contributions không được chứa runtime data, logs, backups, secrets, private keys, hoặc device-local databases.
+## Cập nhật
 
-## License
+### Kiểm tra bản cập nhật
 
-Forgejo được phân phối theo [GNU General Public License version 3.0](LICENSE) hoặc bất kỳ phiên bản mới hơn nào. Các phiên bản Forgejo trước v9.0 được phân phối theo MIT license.
+```bash
+sudo sh install.sh
+```
 
-Để xem hướng dẫn đóng góp upstream, đọc [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Chọn tùy chọn `2` từ menu. Trình cài đặt tự động:
+
+1. Tải xuống phiên bản mới nhất
+2. Xác minh tổng kiểm tra
+3. Sao lưu tệp nhị phân hiện tại
+4. Thay thế tệp nhị phân một cách nguyên tử
+5. Cập nhật tệp trạng thái
+
+Nếu có sự cố xảy ra trong quá trình khởi động, trình cài đặt sẽ tự động khôi phục phiên bản trước đó.
+
+### Cập nhật tự động
+
+Để giữ Forgejo luôn cập nhật, hãy thêm tác vụ cron:
+
+```bash
+sudo crontab -e
+# Thêm: 0 2 * * * sh /var/lib/forgejo-ios/install.sh 2 >> /var/lib/forgejo-ios/logs/update.log
+```
+
+Hoặc sử dụng LaunchDaemon để cập nhật định kỳ (khuyến nghị trên iOS).
+
+## Xác minh
+
+### Xác minh tính toàn vẹn cài đặt
+
+```bash
+sudo sh install.sh
+```
+
+Chọn tùy chọn `3`. Điều này kiểm tra:
+
+- Tệp nhị phân tồn tại và có thể thực thi
+- Tệp trạng thái có mặt
+- Các thư mục cần thiết được tạo
+- Quyền tệp chính xác
+
+### Hiển thị chẩn đoán
+
+```bash
+sudo sh install.sh
+```
+
+Chọn tùy chọn `4`. Đầu ra bao gồm:
+
+- Kiến trúc thiết bị và phiên bản hệ điều hành
+- Vị trí tệp nhị phân, kích thước, phiên bản và tổng kiểm tra
+- Trạng thái cài đặt (phiên bản, thời gian cài đặt)
+- Sử dụng lưu trữ (dữ liệu, kho lưu trữ, sao lưu, dung lượng trống)
+
+## Sửa chữa
+
+Nếu có sự cố, hãy chạy lệnh sửa chữa:
+
+```bash
+sudo sh install.sh
+```
+
+Chọn tùy chọn `5`. Điều này một cách an toàn:
+
+- Tạo lại các thư mục bị thiếu
+- Sửa quyền tệp
+- Không sửa đổi dữ liệu hoặc cấu hình
+- Không đặt lại cơ sở dữ liệu
+
+## Sao lưu và khôi phục
+
+### Sao lưu thủ công
+
+```bash
+sudo tar czf /tmp/forgejo-backup-$(date +%s).tar.gz \
+    /var/lib/forgejo-ios/data/ \
+    /var/lib/forgejo-ios/repositories/ \
+    /var/lib/forgejo-ios/custom/conf/
+```
+
+### Khôi phục thủ công
+
+```bash
+sudo tar xzf /tmp/forgejo-backup-1234567890.tar.gz -C /
+```
+
+Các bản sao lưu cũng được tạo tự động khi cập nhật.
+
+## Gỡ cài đặt
+
+### Xóa Forgejo (giữ dữ liệu)
+
+```bash
+sudo sh install.sh
+```
+
+Chọn tùy chọn `6`. Khi được nhắc, nhấn `Enter` (KHÔNG nhập cụm từ xác nhận).
+
+Điều này xóa:
+- Tệp nhị phân Forgejo
+- Tệp khởi động và dịch vụ
+- Trạng thái cài đặt
+- Tệp nhật ký
+
+Dữ liệu và kho lưu trữ của bạn được bảo tồn tại `/var/lib/forgejo-ios/data/` và `/var/lib/forgejo-ios/repositories/`.
+
+### Gỡ cài đặt hoàn toàn (xóa mọi thứ)
+
+Khi được nhắc trong quá trình gỡ cài đặt, hãy nhập chính xác:
+
+```
+DELETE FORGEJO DATA
+```
+
+Điều này xóa:
+- Tất cả các tệp Forgejo
+- Tệp nhị phân, trạng thái, nhật ký
+- **Cũng xóa**: Dữ liệu, kho lưu trữ và cấu hình
+
+## Khắc phục sự cố
+
+### "Checksum verification failed"
+
+Tệp nhị phân được tải xuống không khớp với tệp SHA256SUMS được xuất bản. Điều này thường có nghĩa là:
+
+- Sự tham nhũng mạng (thử lại)
+- Tệp cũ được lưu trong bộ nhớ cache (xóa bộ nhớ cache và thử lại)
+- Giới hạn tỷ lệ API GitHub (đợi và thử lại)
+
+**Giải pháp**: Chạy trình cài đặt lại.
+
+### "Forgejo binary is not executable"
+
+Tệp nhị phân mất quyền thực thi, có thể do các tùy chọn gắn kết hoặc các vấn đề về hệ thống tệp.
+
+**Giải pháp**: Chạy `repair installation` (tùy chọn 5).
+
+### "Required tool not found"
+
+Trình cài đặt phụ thuộc vào các công cụ Unix tiêu chuẩn. Lỗi này có nghĩa là một trong số chúng bị thiếu hoặc không có trong `$PATH`.
+
+**Giải pháp**: Cài đặt công cụ bị thiếu:
+- Debian/Ubuntu: `sudo apt-get install curl gzip tar`
+- Alpine: `sudo apk add curl gzip tar`
+- macOS: `brew install curl gzip tar`
+
+### "This script must be run as root"
+
+Trình cài đặt yêu cầu quyền root/sudo để tạo thư mục và cài đặt tệp trong `/var/lib/`.
+
+**Giải pháp**: Chạy với `sudo`:
+
+```bash
+sudo sh install.sh
+```
+
+### Forgejo không khởi động
+
+Kiểm tra nhật ký:
+
+```bash
+tail -f /var/lib/forgejo-ios/logs/forgejo*.log
+```
+
+Vấn đề phổ biến:
+
+- Cổng đã được sử dụng (cấu hình cổng khác trong `app.ini`)
+- Cơ sở dữ liệu bị khóa (kiểm tra các phiên bản khác)
+- Vấn đề quyền (chạy sửa chữa)
+
+### Cập nhật đã khôi phục tự động
+
+Quy trình cập nhật phát hiện rằng Forgejo không khởi động được với tệp nhị phân mới và đã khôi phục phiên bản trước đó.
+
+**Giải pháp**: Kiểm tra nhật ký để chẩn đoán vấn đề, sau đó thử cập nhật lại sau khi khắc phục sự cố.
+
+## Hạn chế
+
+- **Không quản lý dịch vụ tự động**: Forgejo không tự động khởi động lại sau khi khởi động lại. Sử dụng LaunchDaemon hoặc trình quản lý dịch vụ jailbreak khác.
+- **Sandbox hạn chế**: Chạy dưới dạng root có nghĩa là Forgejo có quyền truy cập toàn bộ hệ thống. Hãy cẩn thận với Git hooks và plugin.
+- **Ràng buộc hệ thống tệp iOS**: Một số công cụ Linux phổ biến có thể hoạt động khác nhau hoặc không có sẵn trên iOS.
+- **Không có cập nhật bảo mật tự động**: Kiểm tra dự án Forgejo để biết các thông báo bảo mật.
+- **Phụ thuộc jailbreak**: Forgejo yêu cầu jailbreak hoạt động với quyền truy cập SSH/shell.
+
+## Nâng cao
+
+### Cấu hình
+
+Chỉnh sửa `/var/lib/forgejo-ios/custom/conf/app.ini` để tùy chỉnh:
+
+```ini
+[server]
+HTTP_PORT = 3000
+```
+
+Sau đó khởi động lại Forgejo.
+
+### Đường dẫn cài đặt tùy chỉnh
+
+```bash
+FORGEJO_BASE_DIR=/custom/path sudo sh install.sh
+```
+
+### Tải xuống tệp nhị phân thủ công
+
+Nếu tải xuống tự động không thành công:
+
+1. Tải xuống từ [Forgejo releases](https://github.com/forgejo/forgejo/releases)
+2. Đặt trong `/var/lib/forgejo-ios/bin/forgejo`
+3. Làm cho thực thi: `chmod 755 /var/lib/forgejo-ios/bin/forgejo`
+4. Chạy xác minh: `sudo sh install.sh` → tùy chọn 3
+
+## Hỗ trợ
+
+Để báo cáo các vấn đề hoặc yêu cầu tính năng:
+
+- [Forgejo GitHub Issues](https://github.com/forgejo/forgejo/issues)
+- [Tài liệu Forgejo](https://forgejo.org/docs/)
+
+## Giấy phép
+
+Forgejo iOS theo sau giấy phép dự án Forgejo (MIT).

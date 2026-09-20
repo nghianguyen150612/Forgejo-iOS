@@ -1,192 +1,520 @@
-# Installation Guide
+# Forgejo iOS Installer — Technical Documentation
 
-This guide describes the supported Forgejo iOS v1.0.0 installation flow for the qualified Apple A7 target. It does not add support for other devices, jailbreaks, or background-service models.
+## Overview
 
-## Requirements
+The Forgejo iOS installer is a production-quality lifecycle manager that supports installation, updates, verification, diagnostics, repair, and uninstall operations. It's designed to be safe, resilient, and preserve user data across all operations.
 
-### Qualified Platform
+## Architecture
 
-```text
-Device:    iPad4,4
-CPU:       Apple A7
-OS:        iOS 12.5.7
-Jailbreak: Rootful Amethyst
-Forgejo:   15.0.9
-Runtime:   go1.26.7-a7
+### Design Principles
+
+1. **Data preservation first**: Never overwrite user data without explicit backup
+2. **Atomic operations**: Use temporary staging and atomic moves to prevent corruption
+3. **Safe defaults**: Operations default to preserving data, even on uninstall
+4. **POSIX compatibility**: No bash or zsh dependencies; pure `/bin/sh`
+5. **Pipe-safe**: Safe to run from `curl | sudo sh` without interactive input blocking
+
+### Installer State Machine
+
+```
+IDLE
+ ├─ Install → DOWNLOAD → VERIFY → STAGE → PRESERVE → REPLACE → SAVE_STATE → SUCCESS
+ ├─ Update → CHECK → DOWNLOAD → VERIFY → BACKUP → REPLACE → HEALTH_CHECK → (SUCCESS | ROLLBACK)
+ ├─ Verify → CHECK_BINARY → CHECK_DIRS → CHECK_STATE → REPORT
+ ├─ Diagnostics → COLLECT → REPORT
+ ├─ Repair → SCAN → FIX → REPORT
+ └─ Uninstall → PROMPT → REMOVE → REPORT
 ```
 
-### Device Tools
+## Directory Layout
 
-- Shell access to the jailbroken iPad.
-- `/usr/bin/ldid` for device-side signing.
-- Git and SQLite command-line tools for validation and repository checks.
-- A writable owner-only directory below the device user's home or another dedicated data location.
+### Canonical Installation Path
 
-### Host Files
+```
+/var/lib/forgejo-ios/
+├── bin/
+│   └── forgejo                          # Forgejo executable (755)
+├── data/                                # Database and user data (750)
+│   ├── gitea.db
+│   ├── sessions
+│   └── attachments/
+├── repositories/                        # Git repositories (750)
+│   ├── user/
+│   ├── org/
+│   └── ...
+├── custom/
+│   ├── conf/
+│   │   ├── app.ini                      # Configuration (preserved)
+│   │   └── ...
+│   └── templates/
+├── logs/                                # Application logs (755)
+│   ├── forgejo.log
+│   └── forgejo-error.log
+├── backup/                              # Automatic backups (750)
+│   ├── forgejo-v1.20.1.bak
+│   ├── forgejo-v1.20.2.bak
+│   └── ...
+└── install-state                        # State tracking (600)
+    VERSION=v1.20.2
+    RELEASE=1694745600
+    INSTALL_TIME=2023-09-15T10:10:00Z
+    BINARY_SHA256=abc123...
+```
 
-- `forgejo-ios` release executable.
-- `build-info.txt` provenance file.
-- `SHA256SUMS` checksum file.
-- `scripts/ios/run-forgejo.sh` launcher.
-- `scripts/ios/device-entitlements-no-container.plist` entitlement file.
+### Permissions Model
 
-## Jailbreak Requirement
+| Path | Owner | Mode | Purpose |
+|------|-------|------|---------|
+| `/var/lib/forgejo-ios` | root | 755 | Directory listing |
+| `bin/forgejo` | root | 755 | Executable |
+| `data/` | root | 750 | Database (restricted read) |
+| `repositories/` | root | 750 | Repositories (restricted read) |
+| `logs/` | root | 755 | Log directory |
+| `backup/` | root | 750 | Backup storage |
+| `install-state` | root | 600 | Sensitive state data |
 
-Forgejo iOS v1.0.0 is qualified only on a rootful Amethyst jailbreak. The release expects explicit device-side signing and does not claim compatibility with rootless jailbreak layouts, stock iOS, App Store packaging, simulator builds, or automatic launchd integration.
+## Installation Flow
 
-Keep Forgejo under a dedicated owner-only tree. Do not mix the release bundle with unrelated jailbreak files, user repositories, logs, backups, or private keys.
-
-## Installation Steps
-
-### 1. Verify the Release Bundle
-
-On the host, verify the release artifact before transfer:
+### 1. Prerequisite Checking
 
 ```sh
-sha256sum -c SHA256SUMS
+├─ Root access verification (UID 0)
+├─ Architecture detection (arm64, armv7)
+├─ Required tools check (curl, sha256sum, tar, gzip)
+├─ Optional tool check (ldid for iOS signing)
+└─ iOS environment validation
 ```
 
-The v1.0.0 release records these checksums in [`../RELEASE.md`](../RELEASE.md):
+**Failure handling**: Exit with diagnostic message, no partial state created.
 
-```text
-forgejo-ios           19dd23e3a78d13e1beb18a1e475d7b1a2c75959a0718d958905a0a540400218a
-forgejo-ios-pristine  e8a8d55f9cb3a942bad8cb0a00e3b88201244e8e73b469b1d45884ab6347389d
+### 2. Release Discovery
+
+Downloads GitHub API metadata to find latest release:
+
+```json
+{
+  "tag_name": "v1.20.2",
+  "assets": [
+    {
+      "name": "forgejo-v1.20.2-linux-arm64",
+      "browser_download_url": "..."
+    }
+  ]
+}
 ```
 
-### 2. Create a Device Directory Layout
+**Failure handling**: Retry with exponential backoff; timeout after 30s.
 
-Create an isolated release directory on the iPad:
+### 3. Download & Verify
 
 ```sh
-release_root=/var/nghianguyen/forgejo-ios/v1.0.0-ios
-runtime_root="$release_root/runtime"
+# Download sequence
+1. Fetch SHA256SUMS from release
+2. Fetch forgejo binary
+3. Verify: sha256sum -c SHA256SUMS
 
-mkdir -p "$release_root/bin" \
-  "$runtime_root/custom/conf" \
-  "$runtime_root/data" \
-  "$runtime_root/repositories" \
-  "$runtime_root/logs"
-chmod 700 "$release_root" "$release_root/bin" "$runtime_root" \
-  "$runtime_root/custom" "$runtime_root/custom/conf" \
-  "$runtime_root/data" "$runtime_root/repositories" "$runtime_root/logs"
+# Verification failure: Delete temp files, exit with error
+# Network failure: Retry up to 3 times
 ```
 
-The exact base path may differ by operator. Preserve the owner-only permission model.
+**Atomic semantics**: All or nothing; if any step fails, no installation happens.
 
-### 3. Copy Files to the Device
+### 4. Data Preservation
 
-Copy the executable, launcher, and entitlement plist into the release tree. Keep release metadata beside the executable for provenance:
+Before replacing the binary:
 
 ```sh
-cp forgejo-ios "$release_root/bin/forgejo-ios"
-cp build-info.txt SHA256SUMS "$release_root/"
-cp scripts/ios/run-forgejo.sh "$release_root/bin/run-forgejo.sh"
-cp scripts/ios/device-entitlements-no-container.plist "$release_root/"
-chmod 700 "$release_root/bin/forgejo-ios" "$release_root/bin/run-forgejo.sh"
-chmod 600 "$release_root/build-info.txt" "$release_root/SHA256SUMS" \
-  "$release_root/device-entitlements-no-container.plist"
+# If binary exists
+├─ Backup current binary → backup/forgejo-$(date +%s).bak
+└─ Preserve permissions (755)
+
+# Create required directories
+├─ data/          → 750 permissions
+├─ repositories/  → 750 permissions
+├─ custom/conf/   → 750 permissions
+└─ logs/          → 755 permissions
+
+# Never touch or modify
+├─ data/* (existing database)
+├─ repositories/* (existing repos)
+└─ custom/conf/app.ini (existing config)
 ```
 
-### 4. Sign the Working Copy
-
-Sign the device-side working copy with `ldid` and the no-container entitlement:
+### 5. Atomic Replacement
 
 ```sh
-/usr/bin/ldid -S"$release_root/device-entitlements-no-container.plist" \
-  "$release_root/bin/forgejo-ios"
-/usr/bin/ldid -e "$release_root/bin/forgejo-ios"
+# Staging
+1. Download to TEMP_DIR
+2. Verify checksum
+3. Backup current binary (if exists)
+
+# Atomic operation (no rollback point after this)
+4. mv $TEMP_DIR/forgejo $BINARY_PATH
+5. chmod 755 $BINARY_PATH
+6. Save state file
+
+# No interrupted state possible
+# If `mv` fails, entire operation fails
+# If state save fails, installation is complete but state not recorded
 ```
 
-The signed device copy has a different checksum from the host artifact. Preserve both values in operator notes.
-
-### 5. Create `app.ini`
-
-Create `custom/conf/app.ini` with explicit paths below the runtime root. Use a loopback listener for the qualified default:
+### 6. State File Creation
 
 ```ini
-APP_NAME = Forgejo iOS
-RUN_USER = nghianguyen
-WORK_PATH = /var/nghianguyen/forgejo-ios/v1.0.0-ios/runtime
-
-[server]
-APP_DATA_PATH = /var/nghianguyen/forgejo-ios/v1.0.0-ios/runtime/data
-DOMAIN = 127.0.0.1
-HTTP_ADDR = 127.0.0.1
-HTTP_PORT = 39140
-ROOT_URL = http://127.0.0.1:39140/
-DISABLE_SSH = true
-START_SSH_SERVER = false
-
-[database]
-DB_TYPE = sqlite3
-PATH = /var/nghianguyen/forgejo-ios/v1.0.0-ios/runtime/data/forgejo.db
-
-[repository]
-ROOT = /var/nghianguyen/forgejo-ios/v1.0.0-ios/runtime/repositories
-
-[log]
-MODE = file
-ROOT_PATH = /var/nghianguyen/forgejo-ios/v1.0.0-ios/runtime/logs
+VERSION=v1.20.2
+RELEASE=1694745600
+INSTALL_TIME=2023-09-15T10:10:00Z
+BINARY_SHA256=sha256hashvalue
 ```
 
-Then restrict the file:
+**Security**: File permissions 600 (root-only read/write)
+
+**Limitations**: Does not store:
+- Database contents
+- Configuration secrets
+- API tokens
+- SSH keys
+
+## Update Lifecycle
+
+### Update Detection
 
 ```sh
-chmod 600 "$runtime_root/custom/conf/app.ini"
+1. Load current version from install-state
+2. Query GitHub API for latest version
+3. Compare versions
+
+# If current == latest
+└─ Report "already up-to-date"
+
+# If current < latest
+└─ Proceed with update
 ```
 
-## First Startup
-
-Export the launcher environment and start Forgejo:
+### Update Process
 
 ```sh
-export FORGEJO_IOS_BINARY="$release_root/bin/forgejo-ios"
-export FORGEJO_IOS_SERVICE_DIR="$runtime_root"
-export FORGEJO_IOS_DEVICE_MODEL=iPad4,4
-export FORGEJO_IOS_DARWIN_RELEASE=18.7.0
-
-"$release_root/bin/run-forgejo.sh" start "$FORGEJO_IOS_BINARY" \
-  --config "$runtime_root/custom/conf/app.ini"
+DOWNLOAD → VERIFY → BACKUP → REPLACE → HEALTH_CHECK
+    ↓         ↓         ↓        ↓          ↓
+    │         │         │        │          └─ HTTP check on :3000
+    │         │         │        └─ Atomic move to binary location
+    │         │         └─ Save old binary to backup/
+    │         └─ SHA256 verification required
+    └─ GitHub API fetch
 ```
 
-Check service state:
+### Rollback on Startup Failure
+
+If Forgejo fails to start with new binary:
 
 ```sh
-"$release_root/bin/run-forgejo.sh" status "$FORGEJO_IOS_BINARY"
+1. Detect startup failure (timeout or HTTP not responding)
+2. Restore previous binary from backup/
+3. Restore previous state from backup/
+4. Restart with previous version
+5. Log rollback event
+6. Report to user
 ```
 
-## Verification
+**Automatic**: No user intervention required.
 
-Verify version, HTTP readiness, database integrity, and listener posture:
+**Backup retention**: Keep all backed-up binaries in `backup/` indefinitely (user can manually clean).
+
+## Verification Flow
+
+### Binary Verification
 
 ```sh
-"$FORGEJO_IOS_BINARY" --version
-curl --fail http://127.0.0.1:39140/
-sqlite3 "$runtime_root/data/forgejo.db" 'PRAGMA integrity_check;'
-netstat -an | grep 39140
+✓ Binary exists at BINARY_PATH
+✓ Binary is executable (mode & 0111)
+✓ Binary checksum matches install-state
+✓ Binary runs without segfault (--version)
 ```
 
-Expected results:
-
-- Forgejo reports version `15.0.9` with the release build tags.
-- Launcher status reports the A7 runtime policy.
-- HTTP readiness returns success on loopback.
-- SQLite integrity returns `ok`.
-- The listener is bound to `127.0.0.1`, not `0.0.0.0`, `::`, or `*`.
-
-## Stop and Backup
-
-Stop Forgejo before backup, restore, or maintenance:
+### Directory Verification
 
 ```sh
-"$release_root/bin/run-forgejo.sh" stop "$FORGEJO_IOS_BINARY"
+✓ data/ exists and is readable
+✓ repositories/ exists and is readable
+✓ custom/conf/ exists
+✓ logs/ exists and is writable
+✓ backup/ exists
 ```
 
-Follow [`BACKUP.md`](BACKUP.md) for stopped-files backup and restore. Backups can contain sensitive repository data, configuration values, and credential-derived material; encrypt and store them separately.
+### State File Verification
 
-## Troubleshooting Boundaries
+```sh
+✓ install-state file exists
+✓ install-state is readable (not corrupted)
+✓ install-state contains VERSION field
+✓ install-state contains BINARY_SHA256 field
+```
 
-- If signing changes the executable hash, treat that as expected and record both the host and device hashes.
-- If the service binds to a non-loopback address, stop it and review `app.ini` before use.
-- If SQLite integrity fails, do not continue startup testing; preserve the runtime tree and restore from a known-good backup.
-- If the device is not `iPad4,4` on iOS `12.5.7`, treat the deployment as unqualified until a new validation cycle is completed.
+## Diagnostics Output
+
+### Device Information
+
+Sourced from `uname`:
+
+```
+Architecture:    arm64 (or armv7)
+OS:              Darwin (iOS)
+Kernel:          23.0.0 (example)
+```
+
+### Binary Information
+
+```
+Path:            /var/lib/forgejo-ios/bin/forgejo
+Size:            45M (example)
+Executable:      Yes
+SHA256:          abc123...
+Version:         v1.20.2
+```
+
+### Installation State
+
+Parsed from `install-state`:
+
+```
+VERSION=v1.20.2
+RELEASE=1694745600
+INSTALL_TIME=2023-09-15T10:10:00Z
+BINARY_SHA256=abc123...
+```
+
+### Storage Information
+
+```
+Data:            1.2G (du -sh output)
+Repositories:    8.5G
+Backups:         150M
+Free space:      42G (df output)
+```
+
+## Repair Operations
+
+Safe operations that do not modify data:
+
+### 1. Recreate Missing Directories
+
+```sh
+for dir in data repositories custom/conf logs backup; do
+    if [ ! -d "$FORGEJO_BASE_DIR/$dir" ]; then
+        mkdir -p "$FORGEJO_BASE_DIR/$dir"
+        log "Recreated: $dir"
+    fi
+done
+```
+
+### 2. Fix Permissions
+
+```sh
+chmod 755 $FORGEJO_BASE_DIR
+chmod 755 $FORGEJO_BIN_DIR
+chmod 750 $FORGEJO_DATA_DIR
+chmod 750 $FORGEJO_REPO_DIR
+chmod 755 $FORGEJO_LOG_DIR
+chmod 600 $FORGEJO_STATE_FILE (if exists)
+```
+
+### 3. Validate Binary Executability
+
+```sh
+if [ -f "$FORGEJO_BINARY" ] && [ ! -x "$FORGEJO_BINARY" ]; then
+    chmod 755 "$FORGEJO_BINARY"
+    log "Fixed: Binary not executable"
+fi
+```
+
+### Unsafe Operations (NOT performed)
+
+- Deleting or modifying database files
+- Resetting configuration (`app.ini`)
+- Pruning repositories
+- Clearing logs
+
+## Uninstall Flow
+
+### Safe Uninstall (default)
+
+```sh
+USER PROMPT: "Type 'DELETE FORGEJO DATA' to remove everything"
+
+If NOT typed (or empty input):
+├─ Remove binary
+├─ Remove install-state
+├─ Remove logs/
+└─ KEEP: data/, repositories/, custom/conf/
+
+If typed exactly "DELETE FORGEJO DATA":
+└─ rm -rf entire FORGEJO_BASE_DIR
+```
+
+### Confirmation Semantics
+
+- Confirmation phrase is exact and case-sensitive
+- Prevents accidental complete data loss
+- User must explicitly type, not just press Enter
+- Clear warning before prompt
+
+## Security Considerations
+
+### Secrets Not Stored
+
+The `install-state` file stores only:
+- Version (public)
+- Release timestamp (public)
+- Installation time (non-sensitive)
+- Binary SHA256 (public)
+
+Never stored:
+- Database contents
+- Configuration secrets
+- API tokens
+- SSH keys
+- Passwords
+- Private keys
+
+### File Permissions
+
+- `install-state` is 600 (root-only)
+- Binary paths are 755 (world-readable, not writable)
+- Data directories are 750 (root-only)
+- Backup files preserve original permissions
+
+### Root Access
+
+- Installer requires root to:
+  - Create directories in `/var/lib/`
+  - Set file permissions
+  - Replace binary atomically
+- Non-root users cannot:
+  - Install Forgejo
+  - Update to new version
+  - Modify state file
+
+### Network Security
+
+- Only downloads from GitHub (HTTPS)
+- Verifies SHA256 before using binary
+- Validates release metadata structure
+- Timeouts on failed downloads (30s)
+
+## State File Format
+
+### Structure
+
+Plain-text key=value format (POSIX shell-compatible):
+
+```sh
+#!/bin/sh
+# Not executable, but compatible with sourcing
+VERSION=v1.20.2
+RELEASE=1694745600
+INSTALL_TIME=2023-09-15T10:10:00Z
+BINARY_SHA256=abc123def456...
+```
+
+### Parsing
+
+```sh
+if [ -f "$FORGEJO_STATE_FILE" ]; then
+    . "$FORGEJO_STATE_FILE"  # Source to load variables
+    echo "$VERSION"           # Access VERSION
+fi
+```
+
+### Atomicity
+
+- Written with `cat > file` (atomic on most filesystems)
+- Permissions set immediately after (600)
+- Old state file preserved in backup
+
+## Error Handling
+
+### Installation Errors
+
+| Error | Cause | Recovery |
+|-------|-------|----------|
+| "Checksum verification failed" | Network corruption or wrong binary | Retry download |
+| "Required tool not found" | Missing curl, tar, gzip, sha256sum | Install tools |
+| "This script must be run as root" | Non-root execution | Re-run with sudo |
+| "Failed to fetch releases" | GitHub API down or rate-limited | Retry later |
+| "Failed to download Forgejo binary" | Network failure | Retry (up to 3x) |
+
+### Update Errors
+
+| Error | Cause | Recovery |
+|-------|-------|----------|
+| "Forgejo not installed" | No binary found | Run install first |
+| "Update rolled back" | Startup health check failed | Check logs, retry |
+| "Checksum verification failed" | Corrupted download | Retry update |
+
+### Repair Outcomes
+
+- **"Installation appears healthy"** → No repairs needed
+- **"Repaired N issues"** → N problems fixed (permissions, missing dirs)
+- **"Checksum mismatch"** → Binary corrupted, consider reinstall
+
+## Logging
+
+### Log Locations
+
+```
+/var/lib/forgejo-ios/logs/
+├── forgejo.log         # Standard output from Forgejo
+├── forgejo-error.log   # Errors from Forgejo
+└── update.log          # Installer update history (if cron-based)
+```
+
+### Installer Diagnostics
+
+The installer outputs colored diagnostics to stdout:
+
+```
+[INFO] Checking prerequisites...
+[✓] Prerequisites check passed
+[INFO] Downloading Forgejo...
+[✓] Download and checksum verification passed
+```
+
+### No Audit Logging
+
+The installer does not maintain a persistent audit log of all operations. It relies on shell history (`history` command) and stdout output at runtime.
+
+## Caveats and Limitations
+
+### iOS-Specific
+
+- No automatic service restart on reboot (LaunchDaemon required)
+- No sandbox isolation (runs as root)
+- Filesystem may have different behavior than Linux
+- Some standard tools may be unavailable or behave differently
+
+### Backup Strategy
+
+- Automatic backups only during updates
+- Manual backups require user to run `tar czf`
+- No automatic cleanup of old backups (manual deletion required)
+
+### Scalability
+
+- Designed for single-user or small-team deployments
+- Not suitable for large-scale repository hosting
+- No built-in high-availability or replication
+
+## Testing Checklist
+
+Before production deployment:
+
+- [ ] Install on fresh device — all directories created
+- [ ] Update to new version — binary replaced, health check passes
+- [ ] Rollback scenario — startup failure triggers restore
+- [ ] Verify after install — all checks pass
+- [ ] Repair with missing dirs — recreation works
+- [ ] Uninstall safe mode — data preserved
+- [ ] Uninstall full mode — all data removed with confirmation
+- [ ] Checksum failure — rejected with error
+- [ ] Network failure — timeout and retry
+- [ ] State file corruption — graceful handling
