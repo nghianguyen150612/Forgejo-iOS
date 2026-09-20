@@ -89,6 +89,69 @@ jobs:
           codesign --verify --verbose=4 build/ios/forgejo-ios-a7
           codesign --display --verbose=4 build/ios/forgejo-ios-a7 >build/ios/forgejo-ios-a7-codesign.txt 2>&1
 
+      - name: Validate launcher status and runtime provenance
+        shell: bash
+        if: success()
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ios/run-forgejo.sh scripts/ios/write-runtime-provenance.sh
+          FORGEJO_IOS_VERSION="$FORGEJO_VERSION" \
+            FORGEJO_IOS_BUILD_TAGS='bindata timetzdata sqlite sqlite_unlock_notify' \
+            scripts/ios/write-runtime-provenance.sh \
+              build/ios/forgejo-ios-a7-pristine \
+              build/ios/forgejo-ios-build-info.txt \
+              a7-ios12
+          FORGEJO_IOS_BUILD_INFO=build/ios/forgejo-ios-build-info.txt \
+            FORGEJO_IOS_SKIP_BINARY_PROBE=1 \
+            FORGEJO_IOS_DEVICE_MODEL=ci-a7-ios12 \
+            FORGEJO_IOS_DARWIN_RELEASE=18.5 \
+            GOMAXPROCS=2 \
+            scripts/ios/run-forgejo.sh status build/ios/forgejo-ios-a7-pristine \
+            | tee build/ios/forgejo-ios-status.txt
+          grep -F 'Runtime: go1.26.7-a7' build/ios/forgejo-ios-status.txt
+          grep -F 'SQLite: enabled' build/ios/forgejo-ios-status.txt
+          grep -F 'Policy: preserve-explicit' build/ios/forgejo-ios-status.txt
+          if grep -Eiq '(^|=)(/Users/|/home/|.*token|.*password|.*secret)' build/ios/forgejo-ios-build-info.txt; then
+            printf '%s\n' 'runtime provenance contains a private path or credential-like field' >&2
+            exit 1
+          fi
+
+      - name: Validate launcher lifecycle with an isolated process
+        shell: bash
+        if: success()
+        run: |
+          set -euo pipefail
+          lifecycle_root="$(mktemp -d)"
+          trap 'rm -rf "$lifecycle_root"' EXIT
+          export FORGEJO_IOS_SERVICE_DIR="$lifecycle_root"
+          export FORGEJO_IOS_DEVICE_MODEL=ci-a7-ios12
+          export FORGEJO_IOS_DARWIN_RELEASE=18.5
+          export FORGEJO_IOS_RUNTIME_VERSION=go1.26.7-a7
+          export FORGEJO_IOS_VERSION="$FORGEJO_VERSION"
+          chmod +x scripts/ios/run-forgejo.sh
+          scripts/ios/run-forgejo.sh start /bin/sleep 60
+          lifecycle_pid="$(sed -n '1p' "$lifecycle_root/forgejo.pid")"
+          scripts/ios/run-forgejo.sh status /bin/sleep | tee build/ios/forgejo-ios-lifecycle-status.txt
+          grep -F "Process: running pid=$lifecycle_pid" build/ios/forgejo-ios-lifecycle-status.txt
+          if scripts/ios/run-forgejo.sh start /bin/sleep 60 >build/ios/forgejo-ios-duplicate.out 2>build/ios/forgejo-ios-duplicate.err; then
+            printf '%s\n' 'duplicate lifecycle start unexpectedly succeeded' >&2
+            exit 1
+          fi
+          grep -F "Forgejo already running PID $lifecycle_pid" build/ios/forgejo-ios-duplicate.err
+          kill -KILL "$lifecycle_pid"
+          sleep 1
+          scripts/ios/run-forgejo.sh status /bin/sleep | grep -F "Process: not-running pid=$lifecycle_pid"
+          scripts/ios/run-forgejo.sh start /bin/sleep 60
+          scripts/ios/run-forgejo.sh stop /bin/sleep
+          test ! -e "$lifecycle_root/forgejo.pid"
+          test -f "$lifecycle_root/logs/forgejo.log"
+          test -f "$lifecycle_root/logs/launcher.log"
+          test -f "$lifecycle_root/logs/runtime.log"
+          if grep -Eiq 'password|token|private key' "$lifecycle_root/logs/launcher.log" "$lifecycle_root/logs/runtime.log"; then
+            printf '%s\n' 'launcher logs contain credential-like text' >&2
+            exit 1
+          fi
+
       - name: Write A7 runtime provenance and checksums
         shell: bash
         if: always()
@@ -130,6 +193,8 @@ jobs:
             scripts/ios/device-entitlements-no-container.plist
             build/ios/forgejo-ios-a7-SHA256SUMS
             build/ios/forgejo-ios-a7-build-info.txt
+            build/ios/forgejo-ios-build-info.txt
+            build/ios/forgejo-ios-status.txt
 
       - name: Upload A7-compatible diagnostics
         if: failure()

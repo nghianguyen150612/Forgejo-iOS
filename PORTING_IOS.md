@@ -1595,3 +1595,247 @@ sibling A7 identifiers, one later iOS release if available, longer but
 bounded service and repository exercises, and explicit provenance-aware
 launcher selection. Do not broaden the patch to other ARM64 operating systems
 or future Go versions without a new source review and device matrix.
+
+## Prompt 008 resource profiling and provenance handoff
+
+Prompt 008 extends the already accepted P7 runtime without changing the Go
+runtime patch or Forgejo source architecture. Its changes are limited to the
+launcher resource/status surface, path-free runtime provenance generation, and
+the A7 workflow checks that exercise those surfaces.
+
+### Resource profile evidence
+
+The primary target remains `iPad4,4`, Apple A7, iOS 12.5.7, Darwin 18.7.0,
+with the P7 artifact provenance `go1.26.7-a7`. The bounded P8 repository
+lifecycle and resource profile used an isolated root and HTTP listener; no
+real repository was used.
+
+The completed short profiles recorded:
+
+| Profile | Samples / workload | RSS | CPU | Threads | Result |
+| --- | --- | ---: | ---: | ---: | --- |
+| Idle | 28 samples | 136832–137068 KB | 0.2% max, 0.021% average | 10 | PASS |
+| HTTP | 50/50 HTTP 200 | 137180–137216 KB | 0.9% max, 0.452% average | 10 | PASS |
+| Git | clone/push/pull workload | 137264 KB peak | 96.7% max | 10–12 | PASS |
+
+The six-hour service soak is run separately at the same isolated root. Its
+monitor requires the Forgejo PID to remain alive, `/` and the authenticated
+repository API to return HTTP 200, and SQLite `PRAGMA integrity_check` to
+return `ok` on every ten-minute sample. The final soak status, sample count,
+range, and stop/restart result are recorded below once the bounded monitor
+finishes.
+
+### Launcher and provenance
+
+`scripts/ios/run-forgejo.sh status` reports the runtime, target device and
+Darwin release, effective `GOMAXPROCS`, policy, Forgejo version, SQLite/Git
+availability, build commit, runtime patch hash, process RSS/CPU, thread count,
+and file-descriptor availability. It does not invent an FD value when the
+device lacks `lsof`.
+
+`scripts/ios/write-runtime-provenance.sh` writes the Forgejo version, source
+commit, `go1.26.7-a7` runtime, exact patch hash, build tags, target tuple, and
+patch scope through a temporary file followed by an atomic rename. The local
+sanitization check passed with no private path or credential-like field.
+
+### Prompt 008 acceptance boundary
+
+The P8 status/provenance implementation is staged for the tested A7/iOS 12
+boundary only. It does not broaden the P7 runtime patch, qualify other A7
+identifiers, or claim thermal, battery, network, or indefinite-soak behavior.
+
+## Prompt 010 service lifecycle and process management
+
+Prompt 010 adds service management around the validated P7/P9 Forgejo
+executable. It changes only `scripts/ios/run-forgejo.sh`, the iOS CI
+launcher checks, and this documentation. It does not modify Forgejo core,
+the Go runtime patch, the SQLite implementation, or the Linux service
+definition. The launcher is a jailbreak-compatible process wrapper and does
+not assume systemd or macOS launchd.
+
+### Launcher commands
+
+The command interface is provided by `scripts/ios/run-forgejo.sh`; on the
+device it can be installed or symlinked as `forgejo-ios`:
+
+```sh
+export FORGEJO_IOS_BINARY=/var/nghianguyen/forgejo-ios-p10/<sha>/forgejo-ios-a7
+export FORGEJO_IOS_SERVICE_DIR=/var/nghianguyen/forgejo-ios-p10/<sha>/runtime
+export FORGEJO_IOS_DEVICE_MODEL=iPad4,4
+export FORGEJO_IOS_DARWIN_RELEASE=18.7.0
+
+forgejo-ios start --config /var/nghianguyen/forgejo-ios-p10/<sha>/app.ini
+forgejo-ios status
+forgejo-ios restart
+forgejo-ios stop
+```
+
+The repository script may be called directly as
+`scripts/ios/run-forgejo.sh`. A binary path may be supplied after `start`
+or `restart`, and a first start may include Forgejo arguments. The launcher
+stores those arguments in a mode-600 `forgejo.args` state file so a later
+argument-free `restart` can reproduce the same invocation. Do not put
+credentials in command-line arguments; use the Forgejo configuration and
+device permissions instead. The legacy direct form,
+`run-forgejo.sh FORGEJO_BINARY [ARG...]`, and the prior
+`run-forgejo.sh status FORGEJO_BINARY [PID]` form remain supported.
+
+### PID and lifecycle behavior
+
+The default state files are below `FORGEJO_IOS_SERVICE_DIR`:
+
+```text
+forgejo.pid       mode 600, one validated numeric PID
+forgejo.binary    mode 600, the executable identity used for validation
+forgejo.args      mode 600, one launch argument per line
+forgejo.pid.lock  transient atomic lifecycle-operation lock
+logs/
+```
+
+`start` rejects an existing live PID that belongs to Forgejo with the
+message `Forgejo already running PID <pid>`. It also scans the process table
+when no PID file exists. An invalid PID file or a live PID belonging to a
+different executable is retained and causes a refusal; the launcher never
+signals an unverified process. PID and state writes use a temporary file and
+same-directory rename. A dead numeric PID is stale state and is removed only
+after the process table confirms it is no longer running.
+
+`stop` sends `SIGTERM`, waits up to `FORGEJO_IOS_STOP_TIMEOUT` seconds
+(default 30), and removes the PID file only after the process exits. A
+timeout retains the PID file and returns an error so a potentially live
+process is not hidden. `restart` runs this stop path first and then starts
+from the saved or supplied arguments. The launcher does not automatically
+send `SIGKILL` after a timeout.
+
+The bounded host lifecycle harness and the A7 CI lifecycle step cover start,
+duplicate refusal, status, SIGKILL-created stale PID recovery, restart,
+SIGTERM stop, PID removal, and the no-credential log check. The corresponding
+device run uses a new P10 runtime root and leaves the existing P8 service and
+its monitor untouched.
+
+### Logs and provenance
+
+For a managed service, logs are created below
+`$FORGEJO_IOS_SERVICE_DIR/logs`:
+
+```text
+forgejo.log       Forgejo stdout and stderr
+launcher.log      start/stop/duplicate/error and exec events
+runtime.log       timestamp, lifecycle event, PID, Forgejo version, runtime,
+                  and executable path
+```
+
+The launcher deliberately does not write passwords, access tokens, private
+keys, or full Forgejo arguments to these logs. `forgejo.log` is the
+application's own output and must be reviewed if a custom Forgejo extension
+or configuration emits sensitive data. The log and state files are created
+with owner-only permissions where the filesystem permits it.
+
+### Jailbreak startup strategy
+
+The supported startup options are classified against the current target as
+follows:
+
+| Option | Classification | Boundary |
+| --- | --- | --- |
+| Manual `forgejo-ios start` from an SSH shell or local jailbreak shell | **PROVEN / TESTED** | The iPad lifecycle run starts, reports, restarts, and stops the A7 binary. It is operator initiated. |
+| A rootful LaunchDaemon or equivalent launchd job | **NOT TESTED** | No plist was installed or enabled. Do not infer macOS launchd behavior or automatic boot support from this port. |
+| A jailbreak-specific startup hook or tweak | **NOT TESTED** | No hook was installed. The hook, environment, filesystem readiness, and network ordering need a separate device test. |
+
+Manual launch is the only supported deployment strategy in this prompt.
+Automatic boot support is intentionally not claimed. A future startup test
+must use a prompt-owned plist or hook, a finite timeout, explicit log paths,
+and a reversible disable/remove procedure; it must not touch the existing P8
+monitor.
+
+### Network validation
+
+The P10 local validation binds the Forgejo HTTP listener to
+`127.0.0.1:<port>` and checks an HTTP 200 response from the iPad itself.
+This is the safe default and is **TESTED**. A listener bound only to
+`127.0.0.1` is not expected to be reachable through the device's Tailscale
+address.
+
+The separately documented Tailscale check uses the active device address
+reported by `tailscale status` and an explicit `HTTP_ADDR` equal to that
+address, not `0.0.0.0`. The host checks the Tailscale URL for HTTP 200 while
+the device checks the local address and `netstat` listener tuple. This is
+**TESTED** only for the finite P10 request; it does not qualify Wi-Fi,
+internet exposure, firewall policy, or a permanent public bind. No
+unexpected wildcard bind is accepted.
+
+### Resource boundary and regression
+
+The P10 resource check is limited to at most ten minutes and samples the
+Forgejo PID's RSS, process CPU percentage, and thread count during startup,
+HTTP checks, and stop/restart. It is compared with the P9 process-local
+baseline rather than interpreted as whole-device capacity. It does not claim
+thermal, battery, background-execution, or indefinite-soak behavior.
+
+The Linux regression remains:
+
+```sh
+make build TAGS='bindata timetzdata sqlite sqlite_unlock_notify'
+```
+
+The iOS regression remains the A7 workflow's isolated Go 1.26.7 runtime
+build, `runtime.procyieldAsm` inspection, physical-iOS Forgejo build,
+provenance check, launcher lifecycle harness, and artifact upload. The P10
+device evidence is limited to `iPad4,4`, Apple A7, iOS 12.5.7, Darwin
+18.7.0, and the `go1.26.7-a7` runtime provenance.
+
+### P10 device evidence
+
+The bounded device run completed on 2026-09-20 through the existing SSH
+connection to `ipad-server`. It used the P9-accepted A7 Forgejo artifact in
+the isolated root below; no P8/P9 runtime data was modified:
+
+```text
+device: iPad4,4 / Apple A7 / iOS 12.5.7 / Darwin 18.7.0
+runtime root: /var/nghianguyen/forgejo-ios-p10/de9576d6fb0ccfda3b15fc4963d1f4ff85413b31
+local lifecycle port: 127.0.0.1:39131
+Tailscale lifecycle port: 100.126.138.43:39132
+launcher SHA-256: 7b7b654ba55a69b2f6aa87006be0de82ce8b1bb2909cc53fa22ccb317ecffe1b
+runtime: go1.26.7-a7
+runtime patch SHA-256: b9b077f8e5a3408f08b49601a792ba7e32f6c0930302c98a4686e13a74f0bbfc
+```
+
+The existing P8 process remained PID 12820 on loopback port 39129, including
+its monitor. P10 duplicate detection did not mistake that process for the
+isolated P10 binary after identity matching was tightened to the absolute
+executable path.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Start and PID file | **PASS** | P10 PID 40683; PID stored and status reported `running`. |
+| Local HTTP | **PASS** | `127.0.0.1:39131/` returned HTTP 200 after startup. |
+| SQLite initialization/integrity | **PASS** | `forgejo.db` was created; `PRAGMA integrity_check` returned `ok` before and after stop/restart. |
+| Status/resource fields | **PASS** | RSS 150224 KB at first sample; CPU 0.3%; 14 threads; `lsof` unavailable was reported explicitly. |
+| Duplicate start | **PASS** | A second start returned `Forgejo already running PID 40683`; P8 PID 12820 was not treated as the same instance. |
+| Restart | **PASS** | PID 40683 stopped and PID 41096 started; local HTTP 200, `/explore/repos` HTTP 200, and SQLite `ok`. |
+| Crash recovery | **PASS** | SIGKILL left PID 41221; status reported it stopped; start removed stale state and recovered as PID 41307. |
+| Clean stop/orphan check | **PASS** | SIGTERM stopped each P10 process, removed `forgejo.pid`, and left no P10 Forgejo process. |
+| Managed logs | **PASS** | `forgejo.log`, `launcher.log`, and `runtime.log` were present with mode 600; launcher/runtime logs contained no password/token/private-key text. |
+| Manual startup | **PROVEN / TESTED** | All P10 starts were operator initiated through the launcher. |
+| LaunchDaemon/startup hook | **NOT TESTED** | No plist or jailbreak hook was installed. |
+
+The 20-sample resource window lasted approximately 20 seconds during an
+idle local service with an HTTP request on every sample. All 20 requests
+returned HTTP 200. The process-local range was RSS 150224--150372 KB, CPU
+0.0--0.7 percent, and 14 threads throughout. This is compared with the P9
+startup sample of 139888 KB and P9 post-restart sample of 140492 KB; it is
+not a whole-device or thermal qualification.
+
+For network reachability, the service was then restarted with an explicit
+bind to `100.126.138.43:39132`. The host and the device both received HTTP
+200 through that Tailscale address. Device loopback `127.0.0.1:39132`
+returned connection failure as expected for an address-specific bind, and
+`netstat` showed `100.126.138.43.39132 LISTEN` with no wildcard
+`*.39132` or `0.0.0.0.39132` listener. The service was stopped cleanly
+after the check. The Tailscale result is a finite reachability test, not a
+claim about Wi-Fi, internet exposure, firewall policy, or automatic boot.
+
+The P10 root contains runtime evidence only and is intentionally outside Git.
+The P10 HTTP check used an empty isolated database, so `/explore/repos`
+availability was verified after restart; the P9 workload remains the evidence
+for actual repository objects, Git history, and repository persistence.
