@@ -1,6 +1,6 @@
-# Forgejo iOS 1.0 release candidate
+# Forgejo iOS v1.0.0
 
-Status: Prompt 014 release candidate. This branch is not tagged `v1.0` yet.
+Status: Final v1.0.0 release metadata for the frozen Forgejo iOS A7 target.
 
 ## Build identity
 
@@ -16,7 +16,22 @@ Build date: 2026-09-20 UTC
 Runtime patch SHA-256: b9b077f8e5a3408f08b49601a792ba7e32f6c0930302c98a4686e13a74f0bbfc
 ```
 
-The final source commit is recorded in the candidate `build-info.txt` and in
+## Version freeze
+
+```text
+Forgejo: 15.0.9
+Runtime: go1.26.7-a7
+Deployment: iPad4,4
+Device OS: iOS 12.5.7
+CPU: Apple A7
+```
+
+The v1.0.0 release line is frozen to the versions and deployment target above.
+Maintenance must follow [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md) and must
+not change Forgejo source, the Go runtime patch, build behavior, or supported
+deployment assumptions without a new maintenance or upgrade cycle.
+
+The final source commit is recorded in the release `build-info.txt` and in
 the corresponding GitHub Actions run. That file is the authoritative
 provenance record for the source SHA, Go source/toolchain hashes, iPhoneOS
 SDK, deployment metadata, runtime instruction inspection, and signature
@@ -101,6 +116,5 @@ root, and do not reuse disposable validation credentials.
   services and external renderers remain deployment-specific.
 - Backups do not contain the executable, signature, Go runtime, entitlements,
   logs, or external storage, and the backup script is not an encryption tool.
-- Prompt 015 remains intentionally small: create the tag/release, write the
-  final changelog, freeze the branch, and add the maintenance workflow. No
-  product or porting code changes should be made in P15.
+- Maintenance is limited to documented rebuilds of the frozen release matrix
+  unless a new Forgejo or Go runtime update cycle is opened and revalidated.
