@@ -1,0 +1,36 @@
+name: iOS installer lifecycle
+
+on:
+  push:
+    branches: [ios]
+    paths:
+      - install.sh
+      - scripts/ios/install-forgejo.sh
+      - .github/workflows/ios-installer.yml
+  pull_request:
+    paths:
+      - install.sh
+      - scripts/ios/install-forgejo.sh
+      - .github/workflows/ios-installer.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck and POSIX syntax
+        run: |
+          shellcheck -s sh install.sh scripts/ios/install-forgejo.sh
+          sh -n install.sh
+          sh -n scripts/ios/install-forgejo.sh
+      - name: Bootstrap checksum pin
+        run: |
+          expected=$(sed -n 's/^engine_sha=//p' install.sh)
+          printf '%s  scripts/ios/install-forgejo.sh\n' "$expected" | sha256sum -c -
+      - name: Install, verify, update, rollback, repair, uninstall and preservation
+        run: sh scripts/ios/install-forgejo.sh --self-test

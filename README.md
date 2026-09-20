@@ -1,388 +1,129 @@
 # Forgejo iOS
 
-Production-quality Forgejo server for jailbroken iOS devices with complete lifecycle management: install, update, verify, diagnostics, repair, and uninstall.
+[![Installer lifecycle](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-installer.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-installer.yml)
+[![A7 runtime build](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml)
+
+Run [Forgejo](https://forgejo.org/), a self-hosted Git service, natively on a qualified jailbroken iPad. This community port packages Forgejo **15.0.9**, SQLite, and the **go1.26.7-a7** runtime with an installer that manages the application lifecycle and preserves user data by default. It is not an upstream Forgejo support statement.
+
+[Tiếng Việt](README.vi.md) · [Installation guide](docs/INSTALL.md) · [Maintenance](docs/MAINTENANCE.md)
 
 ## Features
 
-- **One-command installation**: `curl -fsSL https://raw.githubusercontent.com/forgejo/forgejo/ios/install.sh | sudo sh`
-- **Automatic updates** with rollback support
-- **Data preservation**: Your repositories and configuration survive updates
-- **Diagnostics**: Comprehensive system health checks
-- **Safe uninstall**: Remove Forgejo while keeping your data
-- **State management**: Track installation version and integrity
-- **POSIX-compatible**: No bash or zsh dependencies
-- **Safe from pipe**: Handles `stdin` safely when run from curl pipe
+- Physical iOS arm64 executable with the qualified Apple A7 runtime patch.
+- Forgejo web UI, HTTP Git hosting, and SQLite storage.
+- One entry point for install, update, verify, diagnostics, repair, and uninstall.
+- SHA-256 verification before device signing or replacement; same-filesystem atomic binary replacement.
+- Binary/launcher snapshots and automatic rollback when an update cannot start or pass HTTP health checks.
+- Non-root service execution, owner-only configuration and data, and loopback HTTP.
+- Ordinary uninstall preserves configuration, databases, repositories, and recovery backups.
 
 ## Quick Start
 
-### Installation
+Run on the supported jailbroken iPad from a terminal:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/forgejo/forgejo/ios/install.sh | sudo sh
+```sh
+curl -fsSL https://raw.githubusercontent.com/nghianguyen150612/forgejo-ios/ios/install.sh | sudo sh
 ```
 
-The installer will:
-1. Check device prerequisites (architecture, jailbreak, required tools)
-2. Download the latest Forgejo iOS release
-3. Verify the SHA256 checksum
-4. Preserve any existing data
-5. Move the binary to `/var/lib/forgejo-ios/bin/forgejo`
-6. Create installation state file
+Choose **1. Install Forgejo**. The installer reads choices from `/dev/tty`, so piped stdin is safe. The default service account is the user invoking sudo; when invoked directly as root it defaults to `mobile`. Forgejo itself never runs as root.
 
-### Launching the installer menu
+After installation, open **http://127.0.0.1:3000/** on the iPad and finish Forgejo's first-run setup, including creating the administrator account. Keep SQLite and the displayed installer-managed paths. This is a loopback deployment.
 
-If you want to re-run the installer without piping:
-
-```bash
-sudo sh install.sh
+```sh
+sudo forgejo-ios verify
+sudo forgejo-ios diagnostics
 ```
 
-This shows an interactive menu:
-
-```
-1. Install Forgejo
-2. Update Forgejo
-3. Verify installation
-4. Show diagnostics
-5. Repair installation
-6. Uninstall Forgejo
-7. Exit
-```
+Before first-run setup creates the database, verification explicitly reports SQLite as not initialized. HTTP readiness at this stage verifies the setup server.
 
 ## Prerequisites
 
-- **iOS version**: Any version with jailbreak access
-- **Architecture**: ARM64 (A9+) or ARMv7 (32-bit devices)
-- **Root access**: Jailbreak with SSH/shell access
-- **Tools**: `curl`, `sha256sum`, `tar`, `gzip`
-- **Optional**: `ldid` for binary signing on iOS
+- Rootful Amethyst jailbreak with root/sudo access; stock iOS and rootless layouts are unsupported.
+- POSIX `/bin/sh`; the installer and installed command require neither Bash nor Zsh.
+- `curl` with HTTPS support, `sha256sum`, `ldid`, `git`, `sqlite3`, `sudo`, `nohup`, `ps`, `stat`, and ordinary Unix filesystem tools.
+- An existing non-root service account and enough free space for staging, the installed binary, and retained binary snapshots. Each executable is about 100 MB; updates retain additional copies.
+- Network access to GitHub and its release-download hosts, or an explicitly supplied offline release bundle.
 
 ## Compatibility
 
-### Supported Architectures
+| Component | Qualified target |
+| --- | --- |
+| Device | iPad mini 2, `iPad4,4` |
+| CPU / OS | Apple A7 / iOS 12.5.7 |
+| Jailbreak | Rootful Amethyst |
+| Forgejo / runtime | 15.0.9 / go1.26.7-a7 |
+| Storage / access | SQLite / loopback HTTP |
+| Startup | Manual lifecycle command; no automatic boot service |
 
-| Architecture | Devices | Status |
-|---|---|---|
-| ARM64 | iPhone 6s+, iPad Air 2+, iPad Pro | Fully supported |
-| ARMv7 | iPhone 5s, earlier iPad Air, iPad mini 2-3 | Fully supported |
-
-### iOS Versions
-
-Forgejo iOS runs on any jailbroken iOS version with sufficient free storage (minimum 200 MB for binary, data directory).
-
-### Device Requirements
-
-- Minimum 512 MB available RAM
-- 200 MB free storage (binary)
-- 1 GB+ recommended for data and repositories
+The installer checks CPU type, device model, iOS version, root access, and tools. It cannot prove a jailbreak's distribution name from tools alone. Other platforms require their own qualification.
 
 ## Installation
 
-### Standard installation (interactive)
+The default root is `/var/lib/forgejo-ios/`, with `bin/`, `custom/conf/`, `data/`, `repositories/`, `logs/`, `backup/`, and `install-state`. Internal `run/` files track the service PID. The command is linked at `/usr/local/bin/forgejo-ios`.
 
-```bash
-sudo sh install.sh
-```
+The bootstrap verifies a pinned SHA-256 of its POSIX lifecycle engine. The engine downloads the pinned `v1.0.0-ios` release, verifies its binary against `SHA256SUMS` and the qualified A7 artifact hash, signs a staged working copy with `ldid`, and starts it as the service account. It writes a new `app.ini` only if one does not exist.
 
-Choose option `1` from the menu.
-
-### Automatic installation (from curl pipe)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/forgejo/forgejo/ios/install.sh | sudo sh
-```
-
-This defaults to install mode when `stdin` is not a terminal.
-
-### Custom installation directory
-
-The default installation directory is `/var/lib/forgejo-ios`. To use a different location:
-
-```bash
-FORGEJO_BASE_DIR=/custom/path sudo sh install.sh
-```
-
-### Directory structure after install
-
-```
-/var/lib/forgejo-ios/
-├── bin/
-│   └── forgejo              # Forgejo binary
-├── data/                    # User data (preserved on update)
-├── repositories/            # Git repositories (preserved on update)
-├── custom/
-│   └── conf/
-│       └── app.ini         # Forgejo configuration (preserved)
-├── logs/                    # Application logs
-├── backup/                  # Automatic backups during update
-└── install-state            # Version and checksum tracking
-```
-
-## First Startup
-
-After installation, start Forgejo:
-
-```bash
-/var/lib/forgejo-ios/bin/forgejo web
-```
-
-Or use your jailbreak's service manager (e.g., `launchd` on iOS):
-
-```bash
-# Create a LaunchDaemon plist for autostart
-sudo tee /Library/LaunchDaemons/com.forgejo.plist > /dev/null << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.forgejo</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/var/lib/forgejo-ios/bin/forgejo</string>
-        <string>web</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/var/lib/forgejo-ios/logs/forgejo.log</string>
-    <key>StandardErrorPath</key>
-    <string>/var/lib/forgejo-ios/logs/forgejo-error.log</string>
-</dict>
-</plist>
-EOF
-```
-
-Then load the service:
-
-```bash
-sudo launchctl load /Library/LaunchDaemons/com.forgejo.plist
-```
+For review before execution, download the bootstrap to a file and inspect it. For offline installation, custom paths, account selection, permissions, and recovery, see [docs/INSTALL.md](docs/INSTALL.md). Existing manually managed installations need an explicit path/ownership review; the installer does not silently migrate them.
 
 ## Updating
 
-### Check for updates
-
-```bash
-sudo sh install.sh
+```sh
+sudo forgejo-ios update
+sudo forgejo-ios verify
 ```
 
-Choose option `2` from the menu. The installer automatically:
+Or select **2. Update Forgejo** in the menu. A failed startup or HTTP check restores the previous binary, launcher, installer state, permissions, and running/stopped state. The PID changes when a running service is restarted.
 
-1. Downloads the latest version
-2. Verifies the checksum
-3. Backs up the current binary
-4. Replaces the binary atomically
-5. Updates the state file
+The current release line is frozen: update safely reinstalls the qualified `15.0.9` artifact. It does **not** select arbitrary upstream versions. A future release requires a new artifact qualification and installer pin. Binary rollback cannot reverse database migrations; cross-version updates are refused. Take a stopped-files data backup before maintenance.
 
-If something goes wrong during startup, the installer automatically rolls back to the previous version.
+## Service and Uninstall
 
-### Automatic updates
-
-To keep Forgejo up to date automatically, add a cron job:
-
-```bash
-sudo crontab -e
-# Add: 0 2 * * * sh /var/lib/forgejo-ios/install.sh 2 >> /var/lib/forgejo-ios/logs/update.log
+```sh
+sudo forgejo-ios start
+sudo forgejo-ios stop
+sudo forgejo-ios restart
+sudo forgejo-ios repair
+sudo forgejo-ios uninstall
 ```
 
-Or use a LaunchDaemon for periodic updates (recommended on iOS).
+Repair can recreate directories, restore managed permissions, restart the service, and recover a missing binary from a matching snapshot. It never resets configuration, repairs database contents, or deletes data.
 
-## Verification
+Ordinary uninstall stops Forgejo and removes its executable, lifecycle launcher, logs, and installer state. It keeps `data/`, `repositories/`, `custom/conf/`, and recovery backups. Reinstall can reuse this data.
 
-### Verify installation integrity
+To also delete persistent data and recovery backups:
 
-```bash
-sudo sh install.sh
+```sh
+sudo forgejo-ios uninstall --purge
 ```
 
-Choose option `3`. This checks:
+Deletion requires typing **`DELETE FORGEJO DATA`** on `/dev/tty`. There is no unattended confirmation flag. Deleted data requires an external backup to recover.
 
-- Binary exists and is executable
-- State file present
-- Required directories created
-- File permissions correct
+## Backup
 
-### Show diagnostics
-
-```bash
-sudo sh install.sh
-```
-
-Choose option `4`. Output includes:
-
-- Device architecture and OS version
-- Binary location, size, version, and checksum
-- Installation state (version, install time)
-- Storage usage (data, repositories, backups, free space)
-
-## Repair
-
-If something is broken, run the repair command:
-
-```bash
-sudo sh install.sh
-```
-
-Choose option `5`. This safely:
-
-- Recreates missing directories
-- Fixes file permissions
-- Does NOT modify data or configuration
-- Does NOT reset the database
-
-## Backup and Restore
-
-### Manual backup
-
-```bash
-sudo tar czf /tmp/forgejo-backup-$(date +%s).tar.gz \
-    /var/lib/forgejo-ios/data/ \
-    /var/lib/forgejo-ios/repositories/ \
-    /var/lib/forgejo-ios/custom/conf/
-```
-
-### Manual restore
-
-```bash
-sudo tar xzf /tmp/forgejo-backup-1234567890.tar.gz -C /
-```
-
-Backups are also created automatically when updating.
-
-## Uninstall
-
-### Remove Forgejo (keep data)
-
-```bash
-sudo sh install.sh
-```
-
-Choose option `6`. When prompted, press `Enter` (do NOT type the confirmation phrase).
-
-This removes:
-- Forgejo binary
-- Launcher and service files
-- Installation state
-- Log files
-
-Your data and repositories are preserved at `/var/lib/forgejo-ios/data/` and `/var/lib/forgejo-ios/repositories/`.
-
-### Complete uninstall (remove everything)
-
-When prompted during uninstall, type exactly:
-
-```
-DELETE FORGEJO DATA
-```
-
-This removes:
-- All Forgejo files
-- Binary, state, logs
-- **Also removes**: Data, repositories, and configuration
+Installer rollback snapshots protect executables and launcher state, **not user data**. Follow [docs/BACKUP.md](docs/BACKUP.md) for a stopped-files backup of SQLite, repositories, and configuration; use the lifecycle command above to stop/start an installer-managed deployment. Review the backup tool's older launcher interface before combining it with this layout. Encrypt backups separately and keep a copy off the device.
 
 ## Troubleshooting
 
-### "Checksum verification failed"
+Run `sudo forgejo-ios diagnostics` for device, checksum, runtime, configuration status, SQLite integrity, owned PID, port, HTTP status, storage sizes, and free space. It does not dump configuration, log contents, database rows, passwords, tokens, or keys.
 
-The downloaded binary does not match the published SHA256SUMS file. This usually means:
+- **Download/checksum failure:** no binary replacement occurs. Confirm release availability and retry; never bypass verification.
+- **Signing/startup failure:** review owner-only `logs/service.log` locally. Do not publish unredacted logs.
+- **Port occupied:** stop the conflicting service or choose a different unprivileged loopback port in `app.ini`, then restart.
+- **Missing binary:** run repair. A backup must match the installed checksum; otherwise manual recovery is required.
+- **Interrupted operation:** preserve its snapshot and inspect `.installer-lock` before removing a stale lock. See [maintenance recovery](docs/MAINTENANCE.md).
 
-- Network corruption (try again)
-- Cached old file (clear cache and retry)
-- GitHub API rate limit (wait and retry)
+## Known limitations
 
-**Solution**: Run the installer again.
+- Qualification is limited to the compatibility matrix above; no App Store, stock iOS, simulator, rootless, or automatic LaunchDaemon support.
+- Loopback HTTP and disabled SSH are enforced by managed config checks. Public exposure requires a separate security design.
+- Updates briefly stop the service and use two successful `/api/healthz` responses plus process ownership checks; they are not zero-downtime deployments.
+- `SIGKILL`, power loss, full-storage failures during recovery, or an unresponsive process can require manual recovery. The installer does not force-kill Forgejo.
+- Repair changes managed directories and executable/config file permissions, not every file inside repositories or databases.
+- Release checksums provide integrity relative to the trusted installer/release source; they are not independently authenticated publisher signatures.
+- Runtime qualification does not establish indefinite uptime, battery, thermal, or capacity guarantees.
 
-### "Forgejo binary is not executable"
-
-The binary lost execute permissions, possibly due to mount options or file system issues.
-
-**Solution**: Run `repair installation` (option 5).
-
-### "Required tool not found"
-
-The installer depends on standard Unix tools. This error means one is missing or not in `$PATH`.
-
-**Solution**: Install the missing tool:
-- Debian/Ubuntu: `sudo apt-get install curl gzip tar`
-- Alpine: `sudo apk add curl gzip tar`
-- macOS: `brew install curl gzip tar`
-
-### "This script must be run as root"
-
-The installer requires root/sudo access to create directories and install files in `/var/lib/`.
-
-**Solution**: Run with `sudo`:
-
-```bash
-sudo sh install.sh
-```
-
-### Forgejo fails to start
-
-Check logs:
-
-```bash
-tail -f /var/lib/forgejo-ios/logs/forgejo*.log
-```
-
-Common issues:
-
-- Port already in use (configure different port in `app.ini`)
-- Database locked (check for other instances)
-- Permission issues (run repair)
-
-### Update rolled back automatically
-
-The update process detected that Forgejo failed to start with the new binary and restored the previous version.
-
-**Solution**: Check logs to diagnose the issue, then try updating again after fixing the problem.
-
-## Limitations
-
-- **No automatic service management**: Forgejo does not self-restart on reboot. Use a LaunchDaemon or other jailbreak service manager.
-- **Limited sandbox**: Running as root means Forgejo has full system access. Be careful with Git hooks and plugins.
-- **iOS filesystem constraints**: Some common Linux tools may behave differently or be unavailable on iOS.
-- **No automatic security updates**: Check the Forgejo project for security announcements.
-- **jailbreak-dependent**: Forgejo requires a working jailbreak with SSH/shell access.
-
-## Advanced
-
-### Configuration
-
-Edit `/var/lib/forgejo-ios/custom/conf/app.ini` to customize:
-
-```ini
-[server]
-HTTP_PORT = 3000
-```
-
-Then restart Forgejo.
-
-### Custom installation path
-
-```bash
-FORGEJO_BASE_DIR=/custom/path sudo sh install.sh
-```
-
-### Manual binary download
-
-If the automatic download fails:
-
-1. Download from [Forgejo releases](https://github.com/forgejo/forgejo/releases)
-2. Place in `/var/lib/forgejo-ios/bin/forgejo`
-3. Make executable: `chmod 755 /var/lib/forgejo-ios/bin/forgejo`
-4. Run verify: `sudo sh install.sh` → option 3
-
-## Support
-
-For issues or feature requests:
-
-- [Forgejo GitHub Issues](https://github.com/forgejo/forgejo/issues)
-- [Forgejo Documentation](https://forgejo.org/docs/)
+Build evidence: [PORTING_IOS.md](PORTING_IOS.md). Frozen artifacts: [RELEASE.md](RELEASE.md). Security: [docs/SECURITY.md](docs/SECURITY.md). Documentation index: [docs/README.md](docs/README.md).
 
 ## License
 
-Forgejo iOS follows the Forgejo project license (MIT).
+Forgejo is licensed under [GNU GPL v3.0 or later](LICENSE). Versions before v9.0 used the MIT license. See [CONTRIBUTING.md](CONTRIBUTING.md) for upstream contribution guidance.
