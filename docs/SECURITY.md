@@ -246,3 +246,26 @@ counts, disposable authentication/Git results, backup checksum/permission
 results, bounded RSS/CPU timings, Linux build result, iOS CI result, and the
 host/GitHub/iPad commit SHAs. Existing P10/P12 evidence remains historical
 where explicitly labelled; it is not silently reused as a P13 result.
+
+## Release-candidate handoff
+
+Prompt 014 does not change this security boundary. The release candidate is
+the source commit plus the generated `forgejo-ios`, `build-info.txt`, and
+`SHA256SUMS` bundle described in [`RELEASE.md`](../RELEASE.md). The CI
+signature is an ad-hoc physical-iOS signature; a device-side working copy is
+re-signed with the installed `ldid` and the no-container entitlement, so its
+checksum is expected to differ from the host artifact checksum.
+
+Before installation, verify the checksum and inspect the provenance file.
+After installation, re-check the entitlements, owner-only modes, effective
+listener address, Forgejo version, runtime version, SQLite integrity, and
+launcher stop behavior. The P14 evidence used a new disposable runtime and
+did not touch the existing device service or real user data. Do not treat the
+release-candidate checksum as a backup confidentiality control or as evidence
+for a different device, jailbreak, iOS release, or automatic startup mode.
+
+The P14 source audit covered the production source and the `scripts/`,
+`docs/`, and `.github/` release surfaces for private-key and common
+credential-like material. Existing upstream test fixtures outside those
+release surfaces are not deployment credentials and are not included in the
+artifact bundle.

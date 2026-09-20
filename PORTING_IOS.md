@@ -1912,3 +1912,152 @@ The final P13 handoff must still report the exact Linux result, iOS workflow
 result, one commit SHA, pushed `origin/ios` SHA, and the synchronized iPad
 checkout/artifact SHA. Runtime data, credentials, keys, logs, cookies, and
 backups are not release artifacts.
+
+## Prompt 014 release candidate
+
+Prompt 014 prepares a reproducible release candidate without changing
+Forgejo source behavior, authentication, the Go runtime patch, or the set of
+enabled features. The candidate is the combination of the source commit, the
+CI-built artifact, its path-free `build-info.txt`, and `SHA256SUMS`.
+
+### Qualified target and build contract
+
+The release boundary remains deliberately narrow:
+
+```text
+Forgejo 15.0.9
+Go runtime go1.26.7-a7
+iPad4,4 / Apple A7 / iOS 12.5.7 / Darwin 18.7.0
+GOOS=ios GOARCH=arm64 CGO_ENABLED=1
+minimum physical iOS target: 12.0
+build tags: bindata timetzdata sqlite sqlite_unlock_notify
+```
+
+The A7 runtime is built only by
+[`scripts/ios/go-runtime/build-go-a7.sh`](scripts/ios/go-runtime/build-go-a7.sh)
+from the guarded Go `1.26.7` source. Its patch SHA-256 is
+`b9b077f8e5a3408f08b49601a792ba7e32f6c0930302c98a4686e13a74f0bbfc` and its
+scope is limited to the `GOOS=ios`, `GOARCH=arm64` `runtime.procyieldAsm`
+fallback. No generated runtime directory, SDK, private key, or credential is
+part of the source release.
+
+The reproducible CI environment is the existing `macos-15` arm64 runner with
+Xcode `16.4`, iPhoneOS SDK `18.5`, Apple clang `17.0.0`, and the isolated
+Go `1.26.7` toolchain. The build uses the physical-iOS Mach-O path and
+records the exact source commit, toolchain hashes, deployment metadata,
+runtime instruction inspection, signature result, and checksums in the
+generated build files. The final source SHA is authoritative in the
+candidate `build-info.txt` and the corresponding CI run.
+
+### Candidate artifact and checksum
+
+The release bundle names the CI ad-hoc-signed working copy `forgejo-ios` and
+keeps the unsigned/pristine build separately when it is distributed for
+device-side signing. The currently verified candidate values are:
+
+```text
+forgejo-ios           19dd23e3a78d13e1beb18a1e475d7b1a2c75959a0718d958905a0a540400218a
+forgejo-ios-pristine  e8a8d55f9cb3a942bad8cb0a00e3b88201244e8e73b469b1d45884ab6347389d
+```
+
+The same executable and scheduler-probe bytes were reproduced by the two
+latest CI checkpoints with unchanged Forgejo build inputs; the source commit
+remains in the provenance file rather than being embedded through VCS build
+metadata. Always verify the downloaded bundle with its accompanying
+`SHA256SUMS`. The device-side `ldid` operation adds the tested no-container
+entitlement and therefore produces a different installed-file checksum;
+preserve the host checksum separately from the installed checksum.
+
+### Installation and final smoke procedure
+
+Only install into a new owner-only runtime tree. Do not point these commands
+at an existing instance or copy a real database into a smoke-test root.
+
+1. Verify `forgejo-ios` against `SHA256SUMS` before transfer. Transfer the
+   executable, [`scripts/ios/run-forgejo.sh`](scripts/ios/run-forgejo.sh), and
+   [`scripts/ios/device-entitlements-no-container.plist`](scripts/ios/device-entitlements-no-container.plist)
+   to the rootful device.
+2. Make a device-side working copy and sign that copy with the installed
+   `/usr/bin/ldid` and the project entitlement plist. Confirm with `ldid -e`
+   that `com.apple.private.security.no-container` is present. The host CI
+   ad-hoc signature is not a promise that an arbitrary jailbreak will accept
+   the file unchanged.
+3. Create `custom/conf/app.ini`, `data/`, `repositories/`, and `logs/` below
+   a dedicated mode-`700` runtime root. Keep `app.ini`, database files, logs,
+   and launcher state at mode `600`. Set an explicit loopback address and
+   disable both Forgejo SSH services for the initial deployment.
+4. Start and inspect the service through the launcher, using a disposable
+   port and the explicit configuration path:
+
+   ```sh
+   export FORGEJO_IOS_BINARY=/var/nghianguyen/forgejo-ios/<candidate>/bin/forgejo-ios
+   export FORGEJO_IOS_SERVICE_DIR=/var/nghianguyen/forgejo-ios/<candidate>/runtime
+   export FORGEJO_IOS_DEVICE_MODEL=iPad4,4
+   export FORGEJO_IOS_DARWIN_RELEASE=18.7.0
+
+   scripts/ios/run-forgejo.sh start "$FORGEJO_IOS_BINARY" \
+     --config "$FORGEJO_IOS_SERVICE_DIR/custom/conf/app.ini"
+   scripts/ios/run-forgejo.sh status "$FORGEJO_IOS_BINARY"
+   "$FORGEJO_IOS_BINARY" --version
+   PORT=39140
+   curl --fail "http://127.0.0.1:${PORT}/"
+   sqlite3 "$FORGEJO_IOS_SERVICE_DIR/data/forgejo.db" \
+     'PRAGMA integrity_check;'
+   scripts/ios/run-forgejo.sh stop "$FORGEJO_IOS_BINARY"
+   ```
+
+   The expected result is Forgejo `15.0.9`, runtime `go1.26.7-a7`, the A7
+   default `GOMAXPROCS=1` policy, HTTP 200, SQLite `ok`, and a clean stop with
+   no PID file left behind. Inspect the raw `netstat` listener address before
+   following any URL; `0.0.0.0`, `::`, and `*` are not acceptable local-only
+   defaults.
+
+### P14 disposable device evidence
+
+The release-candidate smoke and backup checks used only the isolated tree
+below and did not touch the existing P8 service or any real repository:
+
+```text
+device: iPad4,4 / Apple A7 / iOS 12.5.7 / Darwin 18.7.0
+runtime root: /var/nghianguyen/forgejo-ios-p14/276ef3b783c40348d35fc00ad249f3c9fd76742e
+loopback port: 127.0.0.1:39140
+host artifact SHA-256: 19dd23e3a78d13e1beb18a1e475d7b1a2c75959a0718d958905a0a540400218a
+device ldid copy SHA-256: 90d21e21e14438b5edbc0745a326ffe4a3b3c95e763b9e3d6bab48f6fadb734e
+backup payload SHA-256: b7d7f1f7fa5c97e04c9deab4f06c170de98f1d035d9f83c25c5cda30336cc7bc
+```
+
+The smoke result was **PASS**: the device-side signature exposed the required
+no-container entitlement, `--version` reported Forgejo `15.0.9` with all four
+requested tags, launcher status reported `go1.26.7-a7`, HTTP returned 200,
+SQLite integrity returned `ok`, and the listener was only
+`127.0.0.1:39140`. The service stopped cleanly.
+
+The backup compatibility result was **PASS**: the stopped-files backup and
+manifest verified, the owner-only audit passed for the source/backup/restored
+trees, restore created a new runtime, and the restored service returned HTTP
+200 and SQLite `ok` before a clean stop. The backup contained no repository
+objects; it was intentionally a data-free compatibility check rather than a
+repeat of the P12 workload.
+
+### Release limitations
+
+- Only the rootful Amethyst deployment on `iPad4,4` / Apple A7 / iOS 12.5.7
+  / Darwin 18.7.0 is qualified. Other iOS versions, jailbreak layouts,
+  devices, and non-A7 arm64 CPUs require new build, signing, and runtime
+  evidence.
+- Manual launcher operation is supported. LaunchDaemons, launchd hooks,
+  jailbreak tweaks, automatic boot, and background execution are not claimed.
+- Loopback HTTP is the recommended default. An address-specific Tailscale
+  bind or separately managed reverse proxy requires its own access controls;
+  no public or wildcard bind is qualified by this release candidate.
+- The A7 runtime fallback has bounded device evidence, not a thermal,
+  battery, capacity, or indefinite-soak qualification. Optional Forgejo
+  services and external renderers remain deployment-specific.
+- Backups are confidential filesystem payloads, not encrypted archives. They
+  exclude the executable, signature, runtime, logs, and external storage, and
+  must be protected and encrypted by the operator.
+
+P14 deliberately does not create a tag or GitHub release. Prompt 015 should
+only create the release metadata/changelog, freeze the branch, and install the
+maintenance workflow after the candidate SHA and all three synchronization
+SHAs in the final handoff have been checked.

@@ -231,3 +231,24 @@ repository, archive, or secret is committed.
 The short resource test is capped at ten minutes. It records the backup and
 restore wall time, peak process RSS where available, and backup/runtime storage
 with `du`. It is not a long soak, battery, thermal, or capacity qualification.
+
+## Prompt 014 release-candidate compatibility check
+
+The P14 check used the same backup contract with a fresh, empty device runtime
+and the release-candidate A7 executable. It did not repeat the P12 account,
+repository, clone, or push workload. The runtime was stopped before backup;
+the backup used stopped-files SQLite mode, and restore targeted a different
+filesystem root.
+
+```text
+device: iPad4,4 / Apple A7 / iOS 12.5.7 / Darwin 18.7.0
+runtime: /var/nghianguyen/forgejo-ios-p14/276ef3b783c40348d35fc00ad249f3c9fd76742e
+backup payload SHA-256: b7d7f1f7fa5c97e04c9deab4f06c170de98f1d035d9f83c25c5cda30336cc7bc
+```
+
+Result: **PASS**. The source, backup, and restored trees passed the strict
+owner-only audit; the backup and manifest verified; SQLite integrity returned
+`ok` before and after restore; and the restored disposable service returned
+HTTP 200 and stopped cleanly. No repository objects or real user data were
+included. The runtime, backup, and restored trees are disposable evidence and
+are not release artifacts.

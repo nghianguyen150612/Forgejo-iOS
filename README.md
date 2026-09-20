@@ -35,6 +35,26 @@ If you like any of the following, Forgejo is literally meant for you:
 
 Dive into the [documentation](https://forgejo.org/docs/latest/), subscribe to releases and blog post on [our website](https://forgejo.org), <a href="https://floss.social/@forgejo" rel="me">find us on the Fediverse</a> or hop into [our Matrix room](https://matrix.to/#/#forgejo-chat:matrix.org) if you have any questions or want to get involved.
 
+## Forgejo iOS release candidate
+
+This `ios` branch contains a narrowly qualified native iOS port. It is not a
+general Forgejo support statement and does not change the upstream support
+matrix.
+
+The qualified target is a rootful, jailbroken `iPad4,4` (iPad mini 2) with an
+Apple A7 CPU, iOS `12.5.7`, and Darwin `18.7.0`. The release candidate is
+Forgejo `15.0.9`, built for physical `ios/arm64` with the
+`bindata timetzdata sqlite sqlite_unlock_notify` tags and the isolated
+`go1.26.7-a7` runtime.
+
+For the complete device installation and verification procedure, see
+[`PORTING_IOS.md`](PORTING_IOS.md). Keep the runtime under a dedicated
+owner-only tree and use the strict [backup and restore procedure](docs/BACKUP.md)
+before moving data. The [security and deployment boundary](docs/SECURITY.md)
+documents signing, permissions, network exposure, secrets, and the limits of
+the jailbreak model. The current release-candidate metadata and checksum are
+in [`RELEASE.md`](RELEASE.md).
+
 ## License
 
 Forgejo is distributed under the terms of the [GPL version 3.0](LICENSE) or any later version.
