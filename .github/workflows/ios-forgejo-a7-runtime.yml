@@ -19,6 +19,7 @@ on:
       - 'scripts/ios/**'
       - 'tools/**'
       - 'docs/BACKUP.md'
+      - 'docs/SECURITY.md'
       - 'docs/PERFORMANCE.md'
   workflow_dispatch:
 
@@ -159,12 +160,14 @@ jobs:
         if: success()
         run: |
           set -euo pipefail
+          umask 077
+          chmod +x scripts/ios/audit-security.sh
           fixture_root="$(mktemp -d "$RUNNER_TEMP/forgejo-backup.XXXXXX")"
           trap 'rm -rf "$fixture_root"' EXIT
           runtime="$fixture_root/runtime"
           backup="$fixture_root/backup"
           restored="$fixture_root/restored"
-          mkdir -p "$runtime/custom/conf" "$runtime/data" "$runtime/repositories/alice"
+          mkdir -p "$runtime/custom/conf" "$runtime/data" "$runtime/repositories/alice" "$runtime/logs"
           printf '%s\n' '[database]' 'DB_TYPE = sqlite3' 'PASSWORD = p12-secret' >"$runtime/custom/conf/app.ini"
           sqlite3 "$runtime/data/forgejo.db" "CREATE TABLE p12(k TEXT PRIMARY KEY, v TEXT); INSERT INTO p12 VALUES('user','fixture');"
           work="$fixture_root/work"
@@ -175,6 +178,13 @@ jobs:
           git -C "$work" add README
           git -C "$work" commit -qm initial
           git clone -q --bare "$work" "$runtime/repositories/alice/demo.git"
+          scripts/ios/audit-security.sh "$runtime"
+          chmod 644 "$runtime/custom/conf/app.ini"
+          if scripts/ios/audit-security.sh "$runtime" >"$fixture_root/insecure-audit.out" 2>"$fixture_root/insecure-audit.err"; then
+            printf '%s\n' 'security audit unexpectedly accepted mode-644 app.ini' >&2
+            exit 1
+          fi
+          chmod 600 "$runtime/custom/conf/app.ini"
           export FORGEJO_IOS_VERSION="$FORGEJO_VERSION"
           export FORGEJO_IOS_GIT_COMMIT="$GITHUB_SHA"
           export FORGEJO_IOS_RUNTIME_VERSION=go1.26.7-a7
@@ -191,6 +201,7 @@ jobs:
           scripts/ios/backup-forgejo.sh backup --source-root "$runtime" --output "$backup" >"$fixture_root/backup.out"
           scripts/ios/backup-forgejo.sh verify "$backup"
           scripts/ios/backup-forgejo.sh restore "$backup" --destination "$restored"
+          scripts/ios/audit-security.sh "$backup" "$restored"
           sqlite3 "$restored/data/forgejo.db" 'PRAGMA integrity_check;' | grep -Fx 'ok'
           git --git-dir="$restored/repositories/alice/demo.git" fsck --full
           test "$(stat -f '%Lp' "$backup/payload.tar" 2>/dev/null || stat -c '%a' "$backup/payload.tar")" = 600
@@ -205,6 +216,24 @@ jobs:
             exit 1
           fi
           test -d "$fixture_root/.stale-backup.partial.dead"
+
+      - name: Scan source and generated security surfaces
+        shell: bash
+        if: success()
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ios/audit-security.sh
+          scripts/ios/audit-security.sh --scan-only \
+            build/ios/forgejo-ios-a7-pristine \
+            build/ios/forgejo-ios-a7 \
+            build/ios/forgejo-ios-build-info.txt \
+            build/ios/forgejo-ios-a7-inspection.txt \
+            build/ios/forgejo-ios-a7-procyield-objdump.txt \
+            build/ios/go126-a7-procyield-objdump.txt
+          if git grep -I -n -E 'BEGIN (RSA|OPENSSH|EC|DSA|PRIVATE) KEY|gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}' -- .; then
+            printf '%s\n' 'source tree contains credential-like material' >&2
+            exit 1
+          fi
 
       - name: Write A7 runtime provenance and checksums
         shell: bash
@@ -233,6 +262,7 @@ jobs:
             fi
           done
           cat build/ios/forgejo-ios-a7-SHA256SUMS
+          scripts/ios/audit-security.sh --scan-only build/ios/forgejo-ios-a7-build-info.txt
 
       - name: Upload A7-compatible production artifact
         if: success()

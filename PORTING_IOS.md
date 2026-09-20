@@ -1839,3 +1839,76 @@ The P10 root contains runtime evidence only and is intentionally outside Git.
 The P10 HTTP check used an empty isolated database, so `/explore/repos`
 availability was verified after restart; the P9 workload remains the evidence
 for actual repository objects, Git history, and repository persistence.
+
+## Prompt 013 security hardening and deployment boundary
+
+Prompt 013 hardens the deployment boundary without changing Forgejo
+authentication, the A7 Go runtime patch, or Forgejo feature availability. The
+new [`docs/SECURITY.md`](docs/SECURITY.md) is the operational contract, and
+[`scripts/ios/audit-security.sh`](scripts/ios/audit-security.sh) is a read-only
+mode and credential-surface audit. The launcher now applies `umask 077` and
+restricts a dedicated service tree and explicit configuration file before
+starting Forgejo. The P12 backup workflow now refuses a source or restored
+payload with group/other file bits or non-`700` directories.
+
+### Supported P13 deployment boundary
+
+The supported initial deployment is rootful manual launch on the qualified
+`iPad4,4` target. A dedicated runtime uses `custom/conf/app.ini`, `data/`,
+`repositories/`, and `logs/` below an owner-only root. Configuration, database,
+key, log, launcher-state, and backup metadata files are mode `600`; runtime,
+data, repository, log, and backup directories are mode `700`. A P10 root with
+`app.ini` beside the binary is historical and must be migrated to the P13
+`custom/conf/app.ini` layout before using the strict backup procedure.
+
+The local-only network default is explicit `HTTP_ADDR = 127.0.0.1` with the
+built-in and external Forgejo SSH services disabled unless separately
+qualified. Tailscale access is supported only as an explicit address-specific
+bind with external ACLs. A reverse proxy may terminate TLS and expose the
+service while Forgejo remains loopback-bound. No P13 deployment uses
+`0.0.0.0`, `::`, or `*` as an implicit safe default.
+
+### P13 disposable device evidence
+
+The P13 check used a fresh runtime below
+`/var/nghianguyen/forgejo-ios-p13/work/runtime` and the previously accepted A7
+Forgejo artifact. The existing P8 service on `127.0.0.1:39129` was not
+stopped, restarted, or chmodded. The P13 account, API tokens, cookies, private
+repository, hook marker, database, logs, and backup were disposable and were
+kept outside Git.
+
+| Check | Result | Evidence boundary |
+| --- | --- | --- |
+| Runtime permissions | **PASS** | `audit-security.sh` passed; all P13 directories were `700`, sensitive files including `app.ini`, SQLite/WAL/SHM, private keys, state, and logs were `600`. |
+| Legacy permission audit | **LIMITATION RECORDED** | Historical P8/P10/P11 roots contained `0644` configuration/database files and some `0755` data directories; the active P8 runtime was intentionally not mutated. A P13 restart/new deployment applies the owner-only policy. |
+| Local network | **PASS** | `127.0.0.1:39136` returned HTTP 200; `netstat` showed only `127.0.0.1.39136 LISTEN` for the P13 PID and no wildcard tuple. |
+| Tailscale local-only rejection | **PASS** | Host probe to the device Tailscale address and P13 port returned connection failure (`curl` exit 7, HTTP 000). |
+| Secret leak surface | **PASS** | No tracked private-key/common-token pattern; disposable password was absent from P13 logs, backup output, and backup tree; metadata recorded `SECRETS_IN_METADATA=none`. |
+| Web login/session/logout | **PASS** | Login followed a 303 to dashboard; protected settings returned 200 while signed in, logout returned 200, and settings returned 303 afterward. |
+| Password storage | **PASS** | The temporary account's stored password value was a 100-character hash and did not equal the generated password. No plaintext token column was present in the access-token table. |
+| API token handling | **PASS** | Disposable token authenticated `/api/v1/user` with HTTP 200; a modified token returned HTTP 401; the database retained a 100-character token hash, not the token value. |
+| Private repository visibility | **PASS** | Repository creation returned 201; anonymous API read returned 404; owner token read returned 200. |
+| Git access and hooks | **PASS** | Unauthenticated `git ls-remote` was rejected; authenticated clone/push passed; an owner-only mode `700` pre-receive hook executed; `git fsck --full` passed. |
+| Backup/restore | **PASS** | Stopped-files backup and restore passed SQLite integrity and Git fsck; one repository was retained; backup root was `700`, metadata/manifest/payload were `600`. |
+| Bounded resource window | **PASS** | Startup to loopback HTTP ready: 7 s; six HTTP probes: 6/6; 12 s sample RSS `124664--124780 KB`, CPU `0.0--0.3%`, average `0.150%`. |
+
+The authentication and Git checks validate the existing Forgejo behavior at
+the HTTP/SQLite/Git boundary; they do not replace Forgejo's upstream security
+review. The disposable credentials were not deployment credentials and must
+not be reused.
+
+### CI and release boundary
+
+The iOS workflow now runs the strict permission fixture, an expected-failure
+mode test, backup/restore permission checks, source credential-pattern checks,
+and a generated build/provenance secret scan in addition to the existing A7
+runtime and Forgejo build checks. Linux remains:
+
+```sh
+make build TAGS='bindata timetzdata sqlite sqlite_unlock_notify'
+```
+
+The final P13 handoff must still report the exact Linux result, iOS workflow
+result, one commit SHA, pushed `origin/ios` SHA, and the synchronized iPad
+checkout/artifact SHA. Runtime data, credentials, keys, logs, cookies, and
+backups are not release artifacts.

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+umask 077
 
 usage() {
 	cat >&2 <<'USAGE'
@@ -348,6 +349,62 @@ prepare_service_dirs() {
 	chmod 600 "$launcher_log" "$runtime_log" "$forgejo_log" 2>/dev/null || true
 }
 
+harden_owner_only_tree() {
+	local root="$1"
+	local path
+
+	[[ -d "$root" ]] || return 0
+	while IFS= read -r -d '' path; do
+		chmod go-rwx "$path" || fail "cannot restrict directory permissions: $path"
+	done < <(find "$root" -type d -print0)
+	while IFS= read -r -d '' path; do
+		chmod go-rwx "$path" || fail "cannot restrict file permissions: $path"
+	done < <(find "$root" -type f -print0)
+
+	# Configuration, databases, keys, and state are data files, never executable
+	# files. Keep the explicit 600 contract even if a previous run used 700.
+	while IFS= read -r -d '' path; do
+		chmod 600 "$path" || fail "cannot restrict sensitive file permissions: $path"
+	done < <(find "$root" -type f \( \
+		-name 'app.ini' -o -name '*.db' -o -name '*.db-*' -o \
+		-name '*.key' -o -name '*.pem' -o -name 'authorized_keys' -o \
+		-name '*token*' -o -name '*secret*' -o -name '*password*' -o \
+		-name 'forgejo.pid' -o -name 'forgejo.binary' -o -name 'forgejo.args' -o \
+		-name '*.log' \
+	\) -print0)
+}
+
+config_argument_path() {
+	local index
+	local argument
+
+	for ((index = 0; index < ${#forgejo_args[@]}; index++)); do
+		argument="${forgejo_args[index]}"
+		case "$argument" in
+			--config=*)
+				printf '%s\n' "${argument#--config=}"
+				return 0
+				;;
+			--config|-c)
+				if ((index + 1 < ${#forgejo_args[@]})); then
+					printf '%s\n' "${forgejo_args[index + 1]}"
+				fi
+				return 0
+				;;
+		esac
+	done
+}
+
+harden_service_permissions() {
+	local config_path
+
+	harden_owner_only_tree "$service_dir"
+	config_path="$(config_argument_path || true)"
+	if [[ -n "$config_path" && -f "$config_path" ]]; then
+		chmod 600 "$config_path" || fail "cannot restrict configuration permissions: $config_path"
+	fi
+}
+
 start_service() {
 	local existing_pid
 	local pid
@@ -361,6 +418,7 @@ start_service() {
 		load_saved_args
 	fi
 	prepare_service_dirs
+	harden_service_permissions
 	acquire_lock
 	trap release_lock EXIT
 
@@ -398,11 +456,13 @@ start_service() {
 	if command -v nohup >/dev/null 2>&1; then
 		FORGEJO_IOS_LAUNCHER_LOG="$launcher_log" \
 			FORGEJO_IOS_RUNTIME_LOG="$runtime_log" \
+			FORGEJO_IOS_SERVICE_HARDENED=1 \
 			nohup "$script_path" run "$binary_path" "${forgejo_args[@]}" \
 				>>"$forgejo_log" 2>&1 < /dev/null &
 	else
 		FORGEJO_IOS_LAUNCHER_LOG="$launcher_log" \
 			FORGEJO_IOS_RUNTIME_LOG="$runtime_log" \
+			FORGEJO_IOS_SERVICE_HARDENED=1 \
 			"$script_path" run "$binary_path" "${forgejo_args[@]}" \
 				>>"$forgejo_log" 2>&1 < /dev/null &
 	fi
@@ -603,6 +663,10 @@ if [[ "$mode" == 'run' ]]; then
 	fi
 	if [[ -z "$requested_gomaxprocs" && "$policy" == 'a7-ios12-default' ]]; then
 		export GOMAXPROCS="$effective_gomaxprocs"
+	fi
+	forgejo_args=("$@")
+	if [[ "${FORGEJO_IOS_SERVICE_HARDENED:-0}" != 1 ]]; then
+		harden_service_permissions
 	fi
 	launcher_message="machine=${machine:-unknown} darwin=${darwin_release:-unknown} policy=$policy GOMAXPROCS=${GOMAXPROCS:-unset}"
 	if [[ -n "${FORGEJO_IOS_LAUNCHER_LOG:-}" ]]; then

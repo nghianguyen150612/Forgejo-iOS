@@ -53,6 +53,49 @@ file_mode() {
 	printf '%s\n' "${mode:-unknown}"
 }
 
+owner_only_mode() {
+	local mode="$1"
+	local numeric
+
+	[[ "$mode" =~ ^[0-7]+$ ]] || return 1
+	numeric=$((8#$mode))
+	(( (numeric & 077) == 0 ))
+}
+
+require_directory_mode() {
+	local path="$1"
+	local mode
+
+	[[ -d "$path" ]] || fail "required directory is missing: $path"
+	mode="$(file_mode "$path")"
+	[[ "$mode" == '700' ]] || fail "directory must be mode 700: $path (mode $mode)"
+}
+
+validate_runtime_permissions() {
+	local root="$1"
+	local path
+	local mode
+	local base
+
+	require_directory_mode "$root"
+	while IFS= read -r -d '' path; do
+		mode="$(file_mode "$path")"
+		[[ "$mode" == '700' ]] || fail "directory must be mode 700: $path (mode $mode)"
+	done < <(find "$root" -type d -print0)
+	while IFS= read -r -d '' path; do
+		mode="$(file_mode "$path")"
+		owner_only_mode "$mode" || fail "file has group/other permissions: $path (mode $mode)"
+		base="${path##*/}"
+		case "$base" in
+			app.ini|forgejo.db|forgejo.db-*|*.key|*.pem|authorized_keys|\
+			*token*|*secret*|*password*|metadata.txt|manifest.sha256|payload.tar|\
+			forgejo.pid|forgejo.binary|forgejo.args|*.log)
+				[[ "$mode" == '600' ]] || fail "sensitive file must be mode 600: $path (mode $mode)"
+				;;
+		esac
+	done < <(find "$root" -type f -print0)
+}
+
 sha256_stdin() {
 	if command -v sha256sum >/dev/null 2>&1; then
 		sha256sum | awk '{print $1}'
@@ -240,7 +283,7 @@ verify_backup() {
 	[[ -d "$backup_dir" ]] || fail "backup directory does not exist: $backup_dir"
 	[[ -f "$payload" && -f "$metadata" && -f "$manifest" ]] || \
 		fail 'backup set is incomplete; expected payload.tar, metadata.txt, and manifest.sha256'
-	chmod 700 "$backup_dir" 2>/dev/null || true
+	[[ "$(file_mode "$backup_dir")" == '700' ]] || fail 'backup directory must be mode 700'
 	[[ "$(file_mode "$payload")" == '600' ]] || fail 'payload.tar must be mode 600'
 	[[ "$(file_mode "$metadata")" == '600' ]] || fail 'metadata.txt must be mode 600'
 	[[ "$(file_mode "$manifest")" == '600' ]] || fail 'manifest.sha256 must be mode 600'
@@ -254,6 +297,7 @@ verify_backup() {
 	trap 'rm -rf "$verify_root"' RETURN
 	validate_tar_entries "$payload" "$listing"
 	tar -xf "$payload" -C "$verify_root" || fail 'cannot extract backup payload for verification'
+	validate_runtime_permissions "$verify_root"
 	verify_manifest "$verify_root" "$manifest"
 	[[ -d "$verify_root/custom/conf" && -d "$verify_root/data" && -d "$verify_root/repositories" ]] || \
 		fail 'backup payload is missing a mandatory runtime directory'
@@ -377,6 +421,7 @@ backup_command() {
 	[[ -d "$source_root/repositories" ]] || fail 'mandatory directory is missing: repositories'
 	source_database="$source_root/data/forgejo.db"
 	[[ -f "$source_database" ]] || fail 'mandatory database is missing: data/forgejo.db'
+	validate_runtime_permissions "$source_root"
 
 	if [[ -z "$pid_file" ]]; then
 		pid_file="${FORGEJO_IOS_PID_FILE:-$source_root/forgejo.pid}"
@@ -557,6 +602,7 @@ restore_command() {
 	listing="$work_dir/tar.list"
 	validate_tar_entries "$payload" "$listing"
 	tar -xf "$payload" -C "$work_dir"
+	validate_runtime_permissions "$work_dir"
 	rm -f "$listing"
 	chmod 700 "$work_dir"
 	mv "$work_dir" "$destination"

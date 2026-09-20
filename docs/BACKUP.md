@@ -15,6 +15,11 @@ core, the Go runtime, SQLite, or the launcher. It is intended for an isolated
 runtime root such as `/var/nghianguyen/forgejo-ios-p10/<sha>/runtime`, and it
 never overwrites an existing backup or restore destination.
 
+The P13 security contract in [`docs/SECURITY.md`](SECURITY.md) is a
+prerequisite for this workflow. A backup is refused when the dedicated source
+tree is not owner-only; backup confidentiality is not provided by a checksum
+alone.
+
 ## What must be backed up
 
 The backup command takes the three runtime directories below and packages them
@@ -58,7 +63,10 @@ The backup directory is mode `700`. The payload layout is deterministic and
 does not depend on the absolute source path. `metadata.txt` records a UTC
 timestamp, so two backups of the same bytes are intentionally distinguishable;
 `BACKUP_CHECKSUM_SHA256` is the SHA-256 checksum of `payload.tar`. The manifest
-and the checksum are verified before restore.
+and the checksum are verified before restore. The source runtime and extracted
+payload must also have mode `700` directories and owner-only regular files;
+`app.ini`, database files, key material, logs, and backup metadata are required
+to be mode `600`. The script fails instead of silently broadening access.
 
 The script refuses an existing final backup. It stages data below a hidden
 `.BACKUP_NAME.partial.*` directory and renames that directory into place only
@@ -96,6 +104,13 @@ The command checks `PRAGMA integrity_check;`, validates every `*.git` tree,
 compares repository refs and reachable object history before and after staging,
 and records the database sidecar state. It does not print `app.ini`, database
 rows, Git commit messages, repository contents, or command-line secrets.
+
+The P10 historical runtime examples placed `app.ini` beside the executable.
+That layout is not eligible for this backup command because the command's
+confidentiality boundary requires `custom/conf/app.ini` inside the source
+runtime. Move or recreate the configuration under `custom/conf/`, review every
+absolute path, and pass it explicitly with `--config` before adopting the P13
+backup procedure. Do not back up a mixed or partially migrated tree.
 
 If the launcher still has a live PID, the default is a refusal. The explicit
 live mode is available for a controlled maintenance window:
