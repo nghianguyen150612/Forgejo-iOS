@@ -15,6 +15,7 @@ Run [Forgejo](https://forgejo.org/), a self-hosted Git service, natively on a qu
 - SHA-256 verification before device signing or replacement; same-filesystem atomic binary replacement.
 - Binary/launcher snapshots and automatic rollback when an update cannot start or pass HTTP health checks.
 - Non-root service execution, owner-only configuration and data, and loopback HTTP.
+- Optional rootful iOS LaunchDaemon mode with crash restart and boot persistence; physical enablement remains a target-device gate.
 - Ordinary uninstall preserves configuration, databases, repositories, and recovery backups.
 
 ## Quick Start
@@ -53,7 +54,7 @@ Before first-run setup creates the database, verification explicitly reports SQL
 | Jailbreak | Rootful Amethyst |
 | Forgejo / runtime | 15.0.9 / go1.26.7-a7 |
 | Storage / access | SQLite / loopback HTTP |
-| Startup | Manual lifecycle command; no automatic boot service |
+| Startup | Manual lifecycle command; managed rootful LaunchDaemon is P18 device-gated |
 
 The installer checks CPU type, device model, iOS version, root access, and tools. It cannot prove a jailbreak's distribution name from tools alone. Other platforms require their own qualification.
 
@@ -82,9 +83,26 @@ The current release line is frozen: update safely reinstalls the qualified `15.0
 sudo forgejo-ios start
 sudo forgejo-ios stop
 sudo forgejo-ios restart
+sudo forgejo-ios service install
+sudo forgejo-ios service status
+sudo forgejo-ios service stop
+sudo forgejo-ios service start
+sudo forgejo-ios service restart
+sudo forgejo-ios service uninstall
 sudo forgejo-ios repair
 sudo forgejo-ios uninstall
 ```
+
+`service install` atomically writes and validates
+`/Library/LaunchDaemons/com.forgejo.ios.plist`, loads it through `launchctl`,
+and runs the daemon as the configured non-root service account. The plist uses
+`RunAtLoad`, `KeepAlive`, a fixed `GOMAXPROCS=1` A7 environment, and only
+non-secret paths. `service stop` unloads the daemon and removes stale PID state;
+`service uninstall` removes only the managed plist and preserves the Forgejo
+configuration, database, repositories, logs, and backups. Before any service
+command can touch `/Library/LaunchDaemons`, `sudo -n id` must succeed.
+The host fixtures validate this path; enabling it on the qualified iPad still
+requires the disposable P18 reboot and crash-recovery gate.
 
 Repair can recreate directories, restore managed permissions, restart the service, and recover a missing binary from a matching snapshot. It never resets configuration, repairs database contents, or deletes data.
 
@@ -114,7 +132,10 @@ Run `sudo forgejo-ios diagnostics` for device, checksum, runtime, configuration 
 
 ## Known limitations
 
-- Qualification is limited to the compatibility matrix above; no App Store, stock iOS, simulator, rootless, or automatic LaunchDaemon support.
+- Qualification is limited to the compatibility matrix above; no App Store, stock iOS, simulator, or rootless LaunchDaemon deployment is supported.
+- The P18 LaunchDaemon implementation is host-validated, but boot persistence,
+  crash recovery, and SQLite/HTTP health after reboot remain unproven until the
+  target device accepts the required non-interactive root check.
 - Loopback HTTP and disabled SSH are enforced by managed config checks. Public exposure requires a separate security design.
 - Updates briefly stop the service and use two successful `/api/healthz` responses plus process ownership checks; they are not zero-downtime deployments.
 - `SIGKILL`, power loss, full-storage failures during recovery, or an unresponsive process can require manual recovery. The installer does not force-kill Forgejo.

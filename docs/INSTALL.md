@@ -34,7 +34,7 @@ The service account defaults to `SUDO_USER`, or `mobile` for a direct root invoc
 sudo env FORGEJO_IOS_USER=forgejo sh install.sh install
 ```
 
-The installer never enables Forgejo's unsafe root mode. It runs Forgejo through `sudo -u` with a clean environment, a fixed PATH, `HOME` inside the data directory, and `GOMAXPROCS=1`. This retains the conservative A7 launcher policy. No launchd plist or boot integration is installed.
+The installer never enables Forgejo's unsafe root mode. It runs Forgejo through `sudo -u` with a clean environment, a fixed PATH, `HOME` inside the data directory, and `GOMAXPROCS=1`. This retains the conservative A7 launcher policy. Boot persistence is opt-in: `forgejo-ios service install` creates the managed rootful LaunchDaemon described below; ordinary installation remains manual until that command is run.
 
 ## Directory layout and ownership
 
@@ -62,6 +62,7 @@ The installer never enables Forgejo's unsafe root mode. It runs Forgejo through 
 | `custom/`, `custom/conf/`, `data/`, `repositories/`, `logs/`, `run/` | service account / 700 |
 | `custom/conf/app.ini` | service account / 600 |
 | `logs/service.log` | service account / 600; opened after dropping privileges |
+| `logs/forgejo.log`, `logs/launcher.log` | service account / 600 |
 
 For a user-owned deployment, the manager owns all entries. Repair adjusts only managed entries, not arbitrary contents recursively. Symlinks at managed paths or inside the installation-root ancestry are rejected, except the standard system `/var` alias. Spaces and shell metacharacters are not allowed in custom roots. The final directory name must be `forgejo-ios`, `forgejo-ios-<name>`, or `runtime`.
 
@@ -80,6 +81,50 @@ sudo forgejo-ios restart
 ```
 
 The PID file is checked against the expected executable, arguments, and UID before signaling. An exited PID is cleared; a PID belonging to another process is refused. An untracked process using this executable blocks startup. Shutdown sends SIGTERM and waits up to 30 seconds; it does not send SIGKILL. Startup allows 60 polling attempts, with bounded curl timeouts, and requires HTTP 200 from `/api/healthz` twice with the owned process alive. This can take several minutes on a slow/unhealthy device.
+
+## Persistent LaunchDaemon mode
+
+Persistent mode is implemented only for the rootful qualified deployment and
+remains device-gated until the P18 reboot/crash checks pass. It does
+not change Forgejo source, the Go runtime, the release binary, authentication,
+or the SQLite format. The installer manages exactly:
+
+```text
+/Library/LaunchDaemons/com.forgejo.ios.plist
+```
+
+The plist is written to a same-directory temporary file, validated as XML/plist,
+set to mode `644`, and loaded through `launchctl`. Its program arguments invoke
+the installed manager's foreground `service-run` launcher, which then executes
+the Forgejo binary as the configured non-root account. `RunAtLoad` starts it
+after launchd becomes available and `KeepAlive` lets launchd recover a crashed
+process. The launch environment contains only fixed path, home, and
+`GOMAXPROCS=1` values; it does not carry passwords, tokens, or private keys.
+
+Use:
+
+```sh
+sudo -n id
+sudo forgejo-ios service install
+sudo forgejo-ios service status
+sudo forgejo-ios service stop
+sudo forgejo-ios service start
+sudo forgejo-ios service restart
+sudo forgejo-ios service uninstall
+```
+
+`service install` requires the non-interactive root check before it touches
+`/Library/LaunchDaemons`. It also checks the binary checksum, config and state
+permissions, owner-only runtime directories, and loopback configuration.
+`service stop` unloads the job before waiting for Forgejo and removes stale PID
+state without sending SIGKILL. `service uninstall` stops/unloads the job and
+removes only the plist; it never removes application data or configuration.
+
+Managed logs are below `logs/`: `forgejo.log` captures launchd standard output,
+`launcher.log` captures launcher/error output and startup/PID records, and
+`service.log` records install/start/stop/restart/shutdown control events. Log
+and state files are mode `600`; the service status surface prints only fixed
+health/version/runtime facts and never config contents or credentials.
 
 ## Release verification and signing
 
@@ -156,4 +201,4 @@ Repair recreates managed directories, restores managed permissions, restarts For
 
 ## Validation
 
-CI runs ShellCheck, `sh -n`, the bootstrap engine-pin check, and `sh scripts/ios/install-forgejo.sh --self-test`. The isolated fixtures cover install, verify, update, failed-health rollback, prior running/stopped state, restored permissions/files, checksum refusal, missing-binary repair, uninstall, data preservation, and managed-symlink refusal. Signing/process/HTTP fixtures are mocks, not physical-device evidence. See [MAINTENANCE.md](MAINTENANCE.md) for device acceptance and release procedure.
+CI runs ShellCheck, `sh -n`, LaunchDaemon plist schema validation, the bootstrap engine-pin check, and `sh scripts/ios/install-forgejo.sh --self-test`. The isolated fixtures cover install, verify, update, failed-health rollback, prior running/stopped state, restored permissions/files, checksum refusal, missing-binary repair, uninstall, data preservation, managed-symlink refusal, and the service install/load/start/status/stop/restart/unload path. Signing/process/HTTP/launchd fixtures are mocks, not physical-device evidence. See [MAINTENANCE.md](MAINTENANCE.md) for device acceptance and release procedure.

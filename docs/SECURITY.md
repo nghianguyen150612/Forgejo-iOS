@@ -49,10 +49,13 @@ is useful against ordinary other users only when the jailbreak and device
 permissions remain trusted. It is not a protection against root, a malicious
 jailbreak package, a compromised SSH account, or physical extraction.
 
-Automatic boot through a LaunchDaemon, launchd hook, or tweak is not part of
-the supported P13 deployment. Manual launcher operation from a trusted local
-or SSH shell is the tested startup boundary. An automatic startup integration
-needs its own reversible device validation.
+Persistent boot through the managed rootful LaunchDaemon is an opt-in,
+device-gated service mode. It is distinct from an arbitrary launchd hook or tweak: the installer
+owns only `/Library/LaunchDaemons/com.forgejo.ios.plist`, runs the configured
+non-root account, supplies a fixed environment, and has a reversible unload and
+uninstall path. `sudo -n id` must succeed before that system plist is touched.
+Manual launcher operation remains available for disposable runtimes and for
+device validation before enabling persistence.
 
 ## Filesystem permissions
 
@@ -67,6 +70,11 @@ runtime/repositories/       700
 runtime/logs/               700
 backup/<timestamp>/         700
 ```
+
+The managed LaunchDaemon plist is the exception to the owner-only runtime
+tree: launchd requires the system file at `/Library/LaunchDaemons` to be mode
+`644`. Its referenced logs remain below the mode-`700` runtime `logs/` tree and
+are mode `600`.
 
 Regular files in these trees must have no group/other bits. The following are
 explicitly mode `600`: `app.ini`, SQLite databases and sidecars, SSH/private
@@ -90,7 +98,8 @@ matching file contents.
 Do not use a shared group-readable runtime, a web-served backup directory, or
 a runtime path writable by an unrelated account. Do not put passwords or
 tokens in launcher arguments: `forgejo.args` is protected, but process
-arguments and shell history can still be observable to a privileged user.
+arguments and shell history can still be observable to a privileged user. The
+managed plist intentionally contains no credential environment variables.
 
 ## Network exposure modes
 

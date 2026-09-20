@@ -53,7 +53,7 @@ Trước khi hoàn tất thiết lập, cơ sở dữ liệu có thể chưa t�
 | Jailbreak | Rootful Amethyst |
 | Forgejo / runtime | 15.0.9 / go1.26.7-a7 |
 | Lưu trữ / truy cập | SQLite / HTTP loopback |
-| Khởi động | Lệnh quản lý thủ công; không tự chạy sau khi boot |
+| Khởi động | Lệnh thủ công; LaunchDaemon rootful cần kiểm chứng P18 trên thiết bị |
 
 Trình cài đặt kiểm tra loại CPU, model thiết bị, phiên bản iOS, quyền root và công cụ cần thiết. Chỉ dựa vào các công cụ hiện có thì không thể khẳng định tên bản jailbreak. Những nền tảng khác cần được kiểm chứng riêng.
 
@@ -82,9 +82,24 @@ Dòng release hiện tại được cố định: cập nhật sẽ cài lại a
 sudo forgejo-ios start
 sudo forgejo-ios stop
 sudo forgejo-ios restart
+sudo forgejo-ios service install
+sudo forgejo-ios service status
+sudo forgejo-ios service stop
+sudo forgejo-ios service start
+sudo forgejo-ios service restart
+sudo forgejo-ios service uninstall
 sudo forgejo-ios repair
 sudo forgejo-ios uninstall
 ```
+
+`service install` tạo nguyên tử và kiểm tra
+`/Library/LaunchDaemons/com.forgejo.ios.plist`, sau đó nạp bằng `launchctl`.
+Dịch vụ chạy bằng tài khoản không phải root đã cấu hình, tự khởi động sau boot
+và được launchd khởi động lại khi bị crash. Trước khi chạm vào thư mục hệ
+thống này, `sudo -n id` phải thành công. Lệnh stop gỡ daemon và xóa PID cũ;
+uninstall chỉ xóa plist, giữ nguyên cấu hình, SQLite, repository, log và backup.
+Các fixture trên host đã kiểm tra đường đi này; việc bật trên iPad vẫn cần vượt
+qua cổng kiểm chứng reboot và crash recovery của P18.
 
 Repair có thể tạo lại thư mục bị thiếu, khôi phục quyền của các mục do công cụ quản lý, khởi động lại dịch vụ và phục hồi binary bị mất từ bản sao có checksum phù hợp. Công cụ không đặt lại cấu hình, sửa nội dung cơ sở dữ liệu hay xóa dữ liệu.
 
@@ -114,7 +129,10 @@ Chạy `sudo forgejo-ios diagnostics` để xem thiết bị, checksum, runtime,
 
 ## Giới hạn đã biết
 
-- Chỉ hỗ trợ cấu hình đã nêu; không có App Store, iOS nguyên bản, simulator, rootless hoặc LaunchDaemon tự khởi động.
+- Chỉ hỗ trợ cấu hình đã nêu; không có App Store, iOS nguyên bản, simulator hoặc LaunchDaemon rootless.
+- LaunchDaemon P18 đã được kiểm tra bằng fixture trên host, nhưng persistence
+  sau reboot, crash recovery, SQLite và HTTP trên iPad chưa được xác nhận nếu
+  `sudo -n id` chưa thành công trên thiết bị.
 - Công cụ kiểm tra loopback HTTP và SSH bị tắt trong cấu hình. Truy cập công khai cần thiết kế bảo mật riêng.
 - Cập nhật dừng dịch vụ trong thời gian ngắn, kiểm tra hai lần HTTP 200 từ `/api/healthz` và quyền sở hữu tiến trình; không bảo đảm không gián đoạn.
 - `SIGKILL`, mất nguồn, hết dung lượng trong lúc phục hồi hoặc tiến trình không phản hồi có thể cần xử lý thủ công. Công cụ không ép tắt Forgejo bằng SIGKILL.

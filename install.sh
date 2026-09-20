@@ -4,7 +4,7 @@ set -eu
 umask 077
 PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export PATH
-engine_sha=a7c37b3eb323b67eb4486e68d5eef855aae838d082dd6728e5bfffca50c9e271
+engine_sha=bdeace686ad19aef3f60fd4ad29f898b4e22340aaafa546d509b7bb5274259a0
 engine_url=https://raw.githubusercontent.com/nghianguyen150612/forgejo-ios/ios/scripts/ios/install-forgejo.sh
 command -v curl >/dev/null || { printf '%s\n' 'curl is required' >&2; exit 1; }
 command -v sha256sum >/dev/null || { printf '%s\n' 'sha256sum is required' >&2; exit 1; }

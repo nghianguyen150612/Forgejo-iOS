@@ -26,6 +26,16 @@ init() {
     state=$root/install-state
     pidfile=$root/run/forgejo.pid
     link=/usr/local/bin/forgejo-ios
+    service_log=$root/logs/service.log
+    launchd_label=com.forgejo.ios
+    if [ "${FORGEJO_IOS_TEST_MODE:-0}" = 1 ]; then
+        launchd_dir=${FORGEJO_IOS_TEST_LAUNCHD_DIR:?}
+        launchctl_bin=${FORGEJO_IOS_TEST_LAUNCHCTL:?}
+    else
+        launchd_dir=/Library/LaunchDaemons
+        launchctl_bin=$(command -v launchctl 2>/dev/null || :)
+    fi
+    launchd_plist=$launchd_dir/$launchd_label.plist
     release=${FORGEJO_IOS_RELEASE:-v1.0.0-ios}
     case "$release" in ''|*[!a-zA-Z0-9._-]*|.*) die 'Invalid release tag.';; esac
     stage='' lock_owned=0 active=0 previous='' was_running=0
@@ -41,7 +51,7 @@ check_paths() {
         [ ! -L "$probe" ] || die 'Symlink in installation path.'
         probe=$(dirname "$probe")
     done
-    for item in bin custom custom/conf data repositories logs backup run install-state custom/conf/app.ini bin/forgejo bin/manager.sh bin/forgejo-ios run/forgejo.pid logs/service.log; do
+    for item in bin custom custom/conf data repositories logs backup run install-state custom/conf/app.ini bin/forgejo bin/manager.sh bin/forgejo-ios run/forgejo.pid logs/forgejo.log logs/launcher.log logs/service.log; do
         [ ! -L "$root/$item" ] || die 'Symlink at a managed path; manual review required.'
     done
     if [ -d "$root/bin" ]; then
@@ -139,6 +149,15 @@ permissions() {
     if [ -f "$config" ]; then
         as_user chmod 600 "$config"
     fi
+    if [ -f "$state" ]; then
+        chmod 600 "$state"
+    fi
+    for item in logs/forgejo.log logs/launcher.log logs/service.log; do
+        if [ -f "$root/$item" ]; then
+            if [ "$(id -u)" = 0 ]; then chown -h "$run_user" "$root/$item"; fi
+            chmod 600 "$root/$item"
+        fi
+    done
 }
 layout() {
     mkdir -p "$root/bin" "$root/custom/conf" "$root/data" "$root/repositories" "$root/logs" "$root/backup" "$root/run"
@@ -208,6 +227,366 @@ start_service() {
         fi
     done
     return 1
+}
+service_require_root() {
+    [ "$(id -u)" = 0 ] || die 'LaunchDaemon service commands require root.'
+    command -v sudo >/dev/null 2>&1 || die 'sudo is required before touching /Library/LaunchDaemons.'
+    sudo -n id >/dev/null 2>&1 || die 'sudo -n id must succeed before touching /Library/LaunchDaemons.'
+    [ -n "$launchctl_bin" ] || die 'launchctl is unavailable; service mode is not supported on this system.'
+    if ! command -v plutil >/dev/null 2>&1 && ! command -v xmllint >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
+        die 'A plist/XML validator (plutil, xmllint, or python3) is required for service mode.'
+    fi
+}
+service_launchctl() {
+    [ -n "$launchctl_bin" ] || die 'launchctl is unavailable; service mode is not supported on this system.'
+    "$launchctl_bin" "$@"
+}
+service_loaded() {
+    [ -n "$launchctl_bin" ] || return 1
+    if "$launchctl_bin" print "system/$launchd_label" >/dev/null 2>&1; then
+        return 0
+    fi
+    "$launchctl_bin" list "$launchd_label" >/dev/null 2>&1
+}
+service_log_event() {
+    [ -d "$root/logs" ] || return 0
+    [ -f "$service_log" ] || : >"$service_log"
+    chmod 600 "$service_log"
+    printf '%s event=%s pid=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1" "${2:-none}" >>"$service_log"
+}
+service_prepare_logs() {
+    mkdir -p "$root/logs" "$root/run"
+    if [ "$(id -u)" = 0 ]; then
+        chown -h "$run_user" "$root/logs" "$root/run"
+    fi
+    chmod 700 "$root/logs" "$root/run"
+    for item in logs/forgejo.log logs/launcher.log logs/service.log; do
+        [ ! -L "$root/$item" ] || die "Symlink at managed log path: $item"
+        if [ ! -e "$root/$item" ]; then : >"$root/$item"; fi
+        [ -f "$root/$item" ] || die "Managed log path is not a regular file: $item"
+        if [ "$(id -u)" = 0 ]; then chown -h "$run_user" "$root/$item"; fi
+        chmod 600 "$root/$item"
+    done
+}
+service_validate_permissions() {
+    for item in custom custom/conf data repositories logs run; do
+        [ -d "$root/$item" ] || die "Managed directory is missing: $item"
+        [ "$(mode "$root/$item")" = 700 ] || die "Managed directory must be mode 700: $item"
+    done
+    [ "$(mode "$config")" = 600 ] || die 'Config permissions must be 600.'
+    [ "$(mode "$state")" = 600 ] || die 'Service state permissions must be 600.'
+}
+service_validate_installation() {
+    [ -x "$bin" ] && [ -f "$state" ] || die 'Installation is incomplete.'
+    [ "$(hash "$bin")" = "$(field "$state" BINARY_SHA256)" ] || die 'Installed checksum mismatch; service start refused.'
+    service_prepare_logs
+    service_validate_permissions
+}
+service_pid_status() {
+    pid=
+    [ -f "$pidfile" ] || return 1
+    pid=$(sed -n '1p' "$pidfile" 2>/dev/null || :)
+    case "$pid" in ''|*[!0-9]*) return 1;; esac
+    [ "$pid" -gt 1 ] || return 1
+    kill -0 "$pid" 2>/dev/null || return 1
+    case "$(ps -p "$pid" -o stat= 2>/dev/null || :)" in Z*) return 1;; esac
+    command_line=$(ps -p "$pid" -o command= 2>/dev/null || :)
+    case "$command_line" in "$bin web --config $config --work-path $root") ;; *) return 1;; esac
+    process_uid=$(ps -p "$pid" -o uid= 2>/dev/null | tr -d ' ')
+    [ "$process_uid" = "$run_uid" ]
+}
+service_wait_running() {
+    tries=0
+    while [ "$tries" -lt 60 ]; do
+        if service_pid_status && [ "$(http_status)" = 200 ]; then
+            return 0
+        fi
+        sleep 1
+        tries=$((tries + 1))
+    done
+    return 1
+}
+service_wait_stopped() {
+    tries=0
+    while [ "$tries" -lt 60 ]; do
+        if ! service_pid_status; then
+            rm -f "$pidfile"
+            return 0
+        fi
+        sleep 1
+        tries=$((tries + 1))
+    done
+    return 1
+}
+service_plist_syntax() {
+    if command -v plutil >/dev/null 2>&1; then
+        plutil -lint "$1" >/dev/null 2>&1
+    elif command -v xmllint >/dev/null 2>&1; then
+        xmllint --noout "$1" >/dev/null 2>&1
+    elif command -v python3 >/dev/null 2>&1; then
+        python3 - "$1" <<'PY'
+import plistlib
+import sys
+
+with open(sys.argv[1], 'rb') as stream:
+    plistlib.load(stream)
+PY
+    else
+        die 'A plist/XML validator (plutil, xmllint, or python3) is required.'
+    fi
+}
+service_plist_matches() {
+    [ -f "$launchd_plist" ] && [ ! -L "$launchd_plist" ] || return 1
+    for marker in \
+        "<key>Label</key>" "<string>$launchd_label</string>" \
+        "<key>ProgramArguments</key>" "<string>$root/bin/forgejo-ios</string>" \
+        '<string>service-run</string>' "<key>RunAtLoad</key>" \
+        "<key>KeepAlive</key>" "<key>WorkingDirectory</key>" \
+        "<string>$root</string>" "<key>EnvironmentVariables</key>" \
+        "<key>StandardOutPath</key>" "<string>$root/logs/forgejo.log</string>" \
+        "<key>StandardErrorPath</key>" "<string>$root/logs/launcher.log</string>"; do
+        grep -F -- "$marker" "$launchd_plist" >/dev/null 2>&1 || return 1
+    done
+    ! grep -Eiq 'password|token|private[[:space:]]+key|BEGIN (RSA|OPENSSH|EC|DSA|PRIVATE) KEY' "$launchd_plist"
+}
+service_write_plist() {
+    [ -d "$launchd_dir" ] || die "LaunchDaemon directory is missing: $launchd_dir"
+    [ ! -L "$launchd_dir" ] || die 'LaunchDaemon directory must not be a symlink.'
+    if [ -e "$launchd_plist" ] || [ -L "$launchd_plist" ]; then
+        service_plist_matches || die 'Existing com.forgejo.ios.plist is not managed by this installer.'
+    fi
+    plist_tmp=$(mktemp "$launchd_dir/.$launchd_label.plist.XXXXXX") || die 'Cannot create atomic LaunchDaemon plist.'
+    if ! cat >"$plist_tmp" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$launchd_label</string>
+    <key>UserName</key>
+    <string>$run_user</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$root/bin/forgejo-ios</string>
+        <string>service-run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>WorkingDirectory</key>
+    <string>$root</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key>
+        <string>$root/data</string>
+        <key>GOMAXPROCS</key>
+        <string>1</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>$root/logs/forgejo.log</string>
+    <key>StandardErrorPath</key>
+    <string>$root/logs/launcher.log</string>
+</dict>
+</plist>
+EOF
+    then
+        rm -f "$plist_tmp"
+        die 'Cannot write atomic LaunchDaemon plist.'
+    fi
+    chmod 644 "$plist_tmp"
+    service_plist_syntax "$plist_tmp" || { rm -f "$plist_tmp"; die 'Generated LaunchDaemon plist failed XML/plist validation.'; }
+    service_plist_matches_tmp="$plist_tmp"
+    for marker in \
+        "<key>Label</key>" "<string>$launchd_label</string>" \
+        "<key>ProgramArguments</key>" "<string>$root/bin/forgejo-ios</string>" \
+        '<string>service-run</string>' "<key>RunAtLoad</key>" \
+        "<key>KeepAlive</key>" "<key>WorkingDirectory</key>" \
+        "<string>$root</string>" "<key>EnvironmentVariables</key>" \
+        "<key>StandardOutPath</key>" "<string>$root/logs/forgejo.log</string>" \
+        "<key>StandardErrorPath</key>" "<string>$root/logs/launcher.log</string>"; do
+        grep -F -- "$marker" "$service_plist_matches_tmp" >/dev/null 2>&1 || { rm -f "$plist_tmp"; die 'Generated LaunchDaemon plist is missing a required key.'; }
+    done
+    ! grep -Eiq 'password|token|private[[:space:]]+key|BEGIN (RSA|OPENSSH|EC|DSA|PRIVATE) KEY' "$plist_tmp" || { rm -f "$plist_tmp"; die 'Generated LaunchDaemon plist contains credential-like material.'; }
+    mv -f "$plist_tmp" "$launchd_plist" || { rm -f "$plist_tmp"; die 'Cannot install LaunchDaemon plist atomically.'; }
+    [ "$(mode "$launchd_plist")" = 644 ] || die 'LaunchDaemon plist permissions must be 644.'
+}
+service_start() {
+    service_require_root
+    check_device
+    check_paths
+    choose_user
+    check_config
+    service_validate_installation
+    [ -f "$launchd_plist" ] || die 'LaunchDaemon is not installed; run service install first.'
+    service_plist_syntax "$launchd_plist" || die 'Managed LaunchDaemon plist failed validation.'
+    service_plist_matches || die 'Managed LaunchDaemon plist does not match this installation.'
+    if ! service_loaded; then
+        service_launchctl load "$launchd_plist" || die 'LaunchDaemon load failed.'
+    elif ! service_pid_status; then
+        service_launchctl start "$launchd_label" || service_pid_status || die 'LaunchDaemon start failed.'
+    fi
+    service_log_event start "${pid:-none}"
+    if ! service_wait_running; then
+        service_log_event error "${pid:-none}"
+        die 'LaunchDaemon did not reach HTTP 200; inspect forgejo.log and launcher.log.'
+    fi
+    service_log_event started "$pid"
+    say "Service start PASS: PID $pid"
+}
+service_stop() {
+    service_require_root
+    check_device
+    check_paths
+    choose_user
+    check_config
+    [ -f "$launchd_plist" ] || die 'LaunchDaemon is not installed.'
+    service_plist_syntax "$launchd_plist" || die 'Managed LaunchDaemon plist failed validation.'
+    service_plist_matches || die 'Managed LaunchDaemon plist does not match this installation.'
+    old_pid=none
+    if service_pid_status; then old_pid=$pid; fi
+    service_log_event stop "$old_pid"
+    if service_loaded; then
+        service_launchctl unload "$launchd_plist" || die 'LaunchDaemon unload failed.'
+    fi
+    if service_pid_status; then
+        stop_service || die 'Forgejo did not stop after LaunchDaemon unload.'
+    fi
+    rm -f "$pidfile"
+    service_log_event shutdown "$old_pid"
+    service_log_event stopped "$old_pid"
+    say 'Service stop PASS: unloaded and stopped'
+}
+service_restart() {
+    service_require_root
+    service_log_event restart none
+    service_stop
+    service_start
+}
+service_install() {
+    service_require_root
+    check_device
+    check_paths
+    choose_user
+    check_config
+    service_validate_installation
+    if [ -e "$launchd_plist" ] || [ -L "$launchd_plist" ]; then
+        service_plist_matches || die 'Existing com.forgejo.ios.plist is not managed by this installer.'
+    fi
+    if service_loaded; then
+        service_log_event reload none
+        service_launchctl unload "$launchd_plist" || die 'Existing LaunchDaemon unload failed.'
+        service_wait_stopped || die 'Existing LaunchDaemon did not stop.'
+    fi
+    service_write_plist
+    service_launchctl load "$launchd_plist" || die 'LaunchDaemon load failed.'
+    service_log_event install none
+    if ! service_wait_running; then
+        service_log_event error none
+        service_launchctl unload "$launchd_plist" >/dev/null 2>&1 || :
+        die 'LaunchDaemon loaded but Forgejo did not reach HTTP 200; inspect managed logs.'
+    fi
+    service_log_event started "$pid"
+    say 'Service install PASS: LaunchDaemon loaded and Forgejo is healthy.'
+}
+service_uninstall() {
+    service_require_root
+    check_device
+    check_paths
+    choose_user
+    check_config
+    [ -f "$launchd_plist" ] || die 'LaunchDaemon is not installed.'
+    service_plist_syntax "$launchd_plist" || die 'Managed LaunchDaemon plist failed validation.'
+    service_plist_matches || die 'Managed LaunchDaemon plist does not match this installation.'
+    service_stop
+    rm -f "$launchd_plist"
+    [ ! -e "$launchd_plist" ] || die 'LaunchDaemon plist removal failed.'
+    say 'Service uninstall PASS: LaunchDaemon removed; data and configuration retained.'
+}
+service_status() {
+    service_require_root
+    check_device
+    check_paths
+    choose_user
+    check_config
+    launch_state=unloaded
+    if [ -f "$launchd_plist" ] && service_plist_syntax "$launchd_plist" >/dev/null 2>&1 && service_plist_matches && service_loaded; then
+        launch_state=loaded
+    fi
+    process_state=stopped
+    status_pid=none
+    uptime=not-running
+    if service_pid_status; then
+        process_state=running
+        status_pid=$pid
+        uptime=$(ps -p "$pid" -o etime= 2>/dev/null | tr -d ' ' || :)
+        [ -n "$uptime" ] || uptime=unknown
+    fi
+    version_number=$(field "$state" VERSION 2>/dev/null || :)
+    case "$version_number" in 15.0.9) version_text="Forgejo $version_number"; runtime_text=go1.26.7-a7;; *) version_text=unknown; runtime_text=unknown;; esac
+    http_code=unavailable
+    if [ "$process_state" = running ]; then
+        http_code=$(http_status)
+        case "$http_code" in 200) http_text='200 OK';; ''|000) http_text=unavailable;; *) http_text="$http_code FAIL";; esac
+    else
+        http_text=unavailable
+    fi
+    sqlite_text=not-initialized
+    if [ -f "$root/data/forgejo.db" ]; then
+        if [ "$(as_user sqlite3 -readonly "$root/data/forgejo.db" 'PRAGMA integrity_check;' 2>/dev/null || :)" = ok ]; then
+            sqlite_text=OK
+        else
+            sqlite_text=FAILED
+        fi
+    fi
+    say 'Forgejo iOS Service'
+    say ''
+    say 'LaunchDaemon:'
+    say " $launch_state"
+    say ''
+    say 'Process:'
+    say " $process_state"
+    say ''
+    say 'PID:'
+    say " $status_pid"
+    say ''
+    say 'Version:'
+    say " $version_text"
+    say ''
+    say 'Runtime:'
+    say " $runtime_text"
+    say ''
+    say 'HTTP:'
+    say " $http_text"
+    say ''
+    say 'SQLite:'
+    say " $sqlite_text"
+    say ''
+    say 'Uptime:'
+    say " ${uptime:-unknown}"
+}
+service_run() {
+    [ "$#" = 0 ] || die 'Internal service-run does not accept arguments.'
+    choose_user
+    check_config
+    [ "$(id -u)" = "$run_uid" ] || die 'LaunchDaemon must run Forgejo as the configured non-root service account.'
+    [ -x "$bin" ] || die 'Installed Forgejo binary is missing.'
+    service_prepare_logs
+    [ "$(mode "$config")" = 600 ] || die 'Config permissions must be 600.'
+    for item in custom custom/conf data repositories logs run; do
+        [ "$(mode "$root/$item")" = 700 ] || die "Managed directory must be mode 700: $item"
+    done
+    service_run_pid_tmp=$(mktemp "$root/run/.forgejo.pid.XXXXXX") || die 'Cannot create Forgejo PID state.'
+    printf '%s\n' "$$" >"$service_run_pid_tmp"
+    chmod 600 "$service_run_pid_tmp"
+    mv -f "$service_run_pid_tmp" "$pidfile" || { rm -f "$service_run_pid_tmp"; die 'Cannot install Forgejo PID state.'; }
+    trap 'rm -f "$pidfile"' 0 INT TERM HUP
+    service_log_event startup "$$"
+    printf '%s event=startup pid=%s runtime=go1.26.7-a7 forgejo=15.0.9\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$$" >>"$root/logs/launcher.log"
+    exec env -i PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin USER="$run_user" LOGNAME="$run_user" HOME="$root/data" GOMAXPROCS=1 \
+        "$bin" web --config "$config" --work-path "$root"
 }
 fetch() {
     curl --proto '=https' --proto-redir '=https' -fsSL --connect-timeout 20 --max-time 600 --retry 2 "$1" -o "$2"
@@ -483,16 +862,30 @@ main() {
     init
     action=${1:-menu}; purge=0
     [ "$#" -le 2 ] || die 'Too many arguments.'
-    if [ "$#" = 2 ]; then [ "$action:$2" = uninstall:--purge ] || die 'Only uninstall accepts --purge.'; purge=1; fi
+    if [ "$#" = 2 ]; then
+        case "$action" in
+            uninstall) [ "$2" = --purge ] || die 'Only uninstall accepts --purge.'; purge=1;;
+            service) :;;
+            *) die 'Too many arguments.';;
+        esac
+    fi
     case "$action" in
         menu) menu;; install|update) install_update;; verify) verify;; diagnostics) diagnostics;; repair) repair;; uninstall) uninstall;;
+        service)
+            [ "$#" = 2 ] || die 'Usage: forgejo-ios service [install|uninstall|start|stop|restart|status]'
+            case "$2" in
+                install) service_install;; uninstall) service_uninstall;; start) service_start;; stop) service_stop;; restart) service_restart;; status) service_status;;
+                *) die 'Usage: forgejo-ios service [install|uninstall|start|stop|restart|status]' ;;
+            esac
+            ;;
+        service-run) shift; service_run "$@";;
         start|stop|restart)
             check_paths; choose_user; check_config; lock
             if [ "$action" != stop ]; then
                 [ -f "$state" ] && [ -f "$bin" ] && [ "$(hash "$bin")" = "$(field "$state" BINARY_SHA256)" ] || die 'Installed checksum mismatch; startup refused.'
             fi
             case "$action" in start) start_service;; stop) stop_service;; restart) stop_service && start_service;; esac;;
-        *) die 'Usage: forgejo-ios [install|update|verify|diagnostics|repair|uninstall [--purge]|start|stop|restart]' ;;
+        *) die 'Usage: forgejo-ios [install|update|verify|diagnostics|repair|uninstall [--purge]|start|stop|restart|service ...]' ;;
     esac
 }
 
@@ -503,12 +896,19 @@ fixture_step() {
     [ -d "$2" ] && [ ! -L "$2" ] && [ "$(owner "$2")" = "$(id -u)" ] && [ "$(mode "$2")" = 700 ] || die 'Unsafe fixture sandbox.'
     FORGEJO_IOS_ROOT=$2/runtime
     FORGEJO_IOS_BUNDLE=$2/bundle
-    export FORGEJO_IOS_ROOT FORGEJO_IOS_BUNDLE
+    FORGEJO_IOS_TEST_MODE=1
+    FORGEJO_IOS_TEST_LAUNCHD_DIR=$2/LaunchDaemons
+    FORGEJO_IOS_TEST_LAUNCHCTL=$2/launchctl
+    FORGEJO_IOS_TEST_LAUNCHD_STATE=$2/launchd.loaded
+    FORGEJO_IOS_TEST_RUNTIME=$2/runtime
+    export FORGEJO_IOS_ROOT FORGEJO_IOS_BUNDLE FORGEJO_IOS_TEST_MODE FORGEJO_IOS_TEST_LAUNCHD_DIR FORGEJO_IOS_TEST_LAUNCHCTL FORGEJO_IOS_TEST_LAUNCHD_STATE FORGEJO_IOS_TEST_RUNTIME
     check_device() { :; }
     qualify_artifact() { :; }
     choose_user() { run_user=$(id -un); run_uid=$(id -u); }
     sign_binary() { version=15.0.9; chmod 755 "$stage/forgejo-ios"; }
-    service_pid() { [ -f "$root/run/fixture-running" ]; }
+    service_require_root() { :; }
+    service_pid() { if [ -f "$root/run/fixture-running" ]; then pid=4242; return 0; fi; return 1; }
+    service_pid_status() { service_pid; }
     stop_service() { rm -f "$root/run/fixture-running"; }
     start_service() {
         if [ -f "$root/data/fail-once" ]; then rm "$root/data/fail-once"; return 1; fi
@@ -516,7 +916,16 @@ fixture_step() {
     }
     http_status() { say 200; }
     as_user() { "$@"; }
-    main "$1"
+    case "$1" in
+        service-install) main service install;;
+        service-uninstall) main service uninstall;;
+        service-start) main service start;;
+        service-stop) main service stop;;
+        service-restart) main service restart;;
+        service-status) main service status;;
+        service-run) main service-run;;
+        *) main "$1";;
+    esac
 }
 self_test() {
     test_root=$(mktemp -d /tmp/forgejo-lifecycle-test.XXXXXX)
@@ -525,6 +934,31 @@ self_test() {
     trap 'exit 143' TERM HUP
     test_engine=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
     mkdir "$test_root/bundle"
+    mkdir "$test_root/LaunchDaemons"
+    cat >"$test_root/launchctl" <<'FAKE_LAUNCHCTL'
+#!/bin/sh
+set -eu
+state=${FORGEJO_IOS_TEST_LAUNCHD_STATE:?}
+runtime=${FORGEJO_IOS_TEST_RUNTIME:?}
+case "${1:-}" in
+    print|list)
+        [ -f "$state" ]
+        ;;
+    load)
+        touch "$state" "$runtime/run/fixture-running"
+        ;;
+    unload)
+        rm -f "$state" "$runtime/run/fixture-running"
+        ;;
+    start)
+        touch "$state" "$runtime/run/fixture-running"
+        ;;
+    *)
+        exit 1
+        ;;
+esac
+FAKE_LAUNCHCTL
+    chmod 755 "$test_root/launchctl"
     printf 'release-one\n' >"$test_root/bundle/forgejo-ios"
     (cd "$test_root/bundle" && sha256sum forgejo-ios >SHA256SUMS)
     /bin/sh "$test_engine" --fixture-step install "$test_root"
@@ -533,6 +967,55 @@ self_test() {
     printf 'retained repository\n' >"$test_runtime/repositories/sentinel"
     cp "$test_runtime/custom/conf/app.ini" "$test_root/config-before"
     /bin/sh "$test_engine" --fixture-step verify "$test_root"
+    /bin/sh "$test_engine" --fixture-step service-install "$test_root"
+    test_plist=$test_root/LaunchDaemons/com.forgejo.ios.plist
+    test_validator=$(dirname "$test_engine")/validate-launchdaemon.sh
+    if [ -x "$test_validator" ]; then "$test_validator" "$test_plist"; fi
+    [ -f "$test_plist" ]
+    [ "$(mode "$test_plist")" = 644 ]
+    for item in custom custom/conf data repositories logs run; do [ "$(mode "$test_runtime/$item")" = 700 ]; done
+    [ "$(mode "$test_runtime/custom/conf/app.ini")" = 600 ]
+    [ "$(mode "$test_runtime/install-state")" = 600 ]
+    grep -F '<key>EnvironmentVariables</key>' "$test_plist" >/dev/null
+    grep -F '<key>StandardOutPath</key>' "$test_plist" >/dev/null
+    grep -F '<key>StandardErrorPath</key>' "$test_plist" >/dev/null
+    if grep -Eiq 'password|token|private[[:space:]]+key|BEGIN (RSA|OPENSSH|EC|DSA|PRIVATE) KEY' "$test_plist"; then die 'plist contains credential-like material'; fi
+    /bin/sh "$test_engine" --fixture-step service-status "$test_root" >"$test_root/service-status.out"
+    grep -F ' loaded' "$test_root/service-status.out" >/dev/null
+    grep -F ' running' "$test_root/service-status.out" >/dev/null
+    grep -F 'Forgejo 15.0.9' "$test_root/service-status.out" >/dev/null
+    grep -F 'go1.26.7-a7' "$test_root/service-status.out" >/dev/null
+    grep -F '200 OK' "$test_root/service-status.out" >/dev/null
+    /bin/sh "$test_engine" --fixture-step service-stop "$test_root"
+    [ ! -f "$test_root/LaunchDaemons/com.forgejo.ios.plist" ] && die 'service stop removed the plist.'
+    [ ! -f "$test_runtime/run/fixture-running" ]
+    /bin/sh "$test_engine" --fixture-step service-start "$test_root"
+    /bin/sh "$test_engine" --fixture-step service-restart "$test_root"
+    /bin/sh "$test_engine" --fixture-step service-uninstall "$test_root"
+    [ ! -e "$test_root/LaunchDaemons/com.forgejo.ios.plist" ]
+    [ -f "$test_runtime/data/sentinel" ] && [ -f "$test_runtime/repositories/sentinel" ]
+    for item in install start started stop stopped shutdown restart; do
+        grep -F "event=$item" "$test_runtime/logs/service.log" >/dev/null || die "missing service log event $item"
+    done
+    [ -f "$test_runtime/logs/forgejo.log" ] && [ -f "$test_runtime/logs/launcher.log" ]
+    if grep -Eiq 'password|token|private[[:space:]]+key|BEGIN (RSA|OPENSSH|EC|DSA|PRIVATE) KEY' "$test_runtime/logs/service.log" "$test_runtime/logs/launcher.log" "$test_runtime/logs/forgejo.log"; then die 'fixture logs contain credential-like material'; fi
+    say 'PASS: LaunchDaemon fixture install/load/start/status/stop/restart/unload/uninstall and permission checks'
+    cp -p "$test_runtime/bin/forgejo" "$test_root/forgejo-original"
+    cat >"$test_runtime/bin/forgejo" <<'FAKE_FORGEJO'
+#!/bin/sh
+printf 'GOMAXPROCS=%s HOME=%s USER=%s\n' "$GOMAXPROCS" "$HOME" "$USER" >"$HOME/service-run-environment"
+exit 0
+FAKE_FORGEJO
+    chmod 755 "$test_runtime/bin/forgejo"
+    /bin/sh "$test_engine" --fixture-step service-run "$test_root"
+    grep -F 'GOMAXPROCS=1' "$test_runtime/data/service-run-environment" >/dev/null
+    grep -F "HOME=$test_runtime/data" "$test_runtime/data/service-run-environment" >/dev/null
+    [ "$(mode "$test_runtime/run/forgejo.pid")" = 600 ]
+    grep -F 'event=startup' "$test_runtime/logs/service.log" >/dev/null
+    grep -F 'event=startup' "$test_runtime/logs/launcher.log" >/dev/null
+    rm -f "$test_runtime/run/forgejo.pid" "$test_runtime/data/service-run-environment"
+    mv "$test_root/forgejo-original" "$test_runtime/bin/forgejo"
+    say 'PASS: LaunchDaemon foreground launcher uses clean A7 environment and PID state'
     printf 'release-two\n' >"$test_root/bundle/forgejo-ios"
     (cd "$test_root/bundle" && sha256sum forgejo-ios >SHA256SUMS)
     /bin/sh "$test_engine" --fixture-step update "$test_root"

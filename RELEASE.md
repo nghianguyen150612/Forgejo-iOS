@@ -106,8 +106,10 @@ root, and do not reuse disposable validation credentials.
 - Qualification is limited to the listed rootful `iPad4,4` / A7 / iOS 12.5.7
   target. Other devices, iOS versions, jailbreak layouts, and non-A7 CPUs
   require new evidence.
-- Manual launcher operation is the supported startup mode. Automatic
-  LaunchDaemon/launchd/tweak integration is not qualified.
+- Manual launcher operation is the currently qualified startup mode. The
+  managed rootful LaunchDaemon implementation is host-validated and remains
+  device-gated until the P18 reboot/crash checks pass. Arbitrary launchd
+  hooks/tweaks, rootless deployments, and other devices are not qualified.
 - Loopback HTTP is the safe default. Tailscale or a reverse proxy must use an
   explicit address and separate access controls; wildcard/public exposure is
   not qualified.

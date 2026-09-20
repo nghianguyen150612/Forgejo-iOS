@@ -2061,3 +2061,64 @@ P14 deliberately does not create a tag or GitHub release. Prompt 015 should
 only create the release metadata/changelog, freeze the branch, and install the
 maintenance workflow after the candidate SHA and all three synchronization
 SHAs in the final handoff have been checked.
+
+## Prompt 018 persistent LaunchDaemon service mode
+
+Prompt 018 adds an opt-in native rootful launchd integration around the
+installer-managed Forgejo deployment. It changes only the installer/launcher
+surface, CI validation, and documentation. It does not modify Forgejo source,
+the A7 Go runtime patch, the release artifact, authentication behavior, or the
+SQLite format.
+
+The managed system job is exactly:
+
+```text
+/Library/LaunchDaemons/com.forgejo.ios.plist
+```
+
+`forgejo-ios service install` validates the existing binary checksum, config,
+state, and owner-only runtime tree; prepares `forgejo.log`, `launcher.log`,
+and `service.log`; writes the plist through a same-directory temporary file;
+validates its XML/plist syntax and required keys; checks mode `644`; and loads
+it through `launchctl`. The plist contains `ProgramArguments`, `RunAtLoad`,
+`KeepAlive`, `WorkingDirectory`, `EnvironmentVariables`, `StandardOutPath`,
+and `StandardErrorPath`, and runs the installed `service-run` launcher as the
+configured non-root service account. Its environment contains only fixed
+`PATH`, `HOME`, and `GOMAXPROCS=1` values.
+
+The service command surface is:
+
+```sh
+sudo -n id
+sudo forgejo-ios service install
+sudo forgejo-ios service status
+sudo forgejo-ios service start
+sudo forgejo-ios service stop
+sudo forgejo-ios service restart
+sudo forgejo-ios service uninstall
+```
+
+The explicit non-interactive `sudo -n id` check is a prerequisite for every
+command that manages the system LaunchDaemon path. `service stop` unloads the
+job before waiting for Forgejo, never sends SIGKILL, removes stale PID state,
+and retains data. `service uninstall` removes the managed plist only. The
+status surface reports loaded state, process/PID, qualified Forgejo/runtime
+identity, HTTP health, SQLite integrity, and uptime without printing config
+contents, passwords, tokens, or private keys.
+
+Managed runtime permissions remain:
+
+```text
+runtime directories: 700
+app.ini:              600
+install-state/PID:    600
+managed logs:         600
+LaunchDaemon plist:   644
+```
+
+The host CI gate runs ShellCheck, POSIX syntax checks, a plist schema validator,
+and a disposable fake-launchctl lifecycle covering install/load/start/status/
+stop/restart/unload/uninstall plus data preservation. These are host fixtures;
+they do not prove iOS launchd behavior. Physical-device acceptance requires a
+new disposable P18 runtime, a successful `sudo -n id`, and explicit checks
+before and after reboot and after a `kill -9` crash.
