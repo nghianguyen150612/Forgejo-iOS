@@ -3,7 +3,7 @@ name: iOS Forgejo A7-compatible runtime build
 on:
   push:
     branches:
-      - ios
+      - iOS
     paths:
       - '.github/workflows/ios-forgejo-a7-runtime.yml'
       - 'Makefile'

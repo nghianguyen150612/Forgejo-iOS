@@ -3,7 +3,7 @@ name: iOS Forgejo production build
 on:
   push:
     branches:
-      - ios
+      - iOS
     paths:
       - '.github/workflows/ios-forgejo-production.yml'
       - 'Makefile'
