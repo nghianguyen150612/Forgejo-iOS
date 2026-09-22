@@ -1,6 +1,6 @@
 # Documentation Index
 
-This directory contains the public operator and maintenance documentation for Forgejo iOS. The v1.0.0 release is frozen to Forgejo `15.0.9`, `go1.26.7-a7`, and the qualified `iPad4,4` Apple A7 target.
+This directory contains the public operator and maintenance documentation for Forgejo-iOS. The v1.0.0 release is frozen to Forgejo `15.0.9`, `go1.26.7-a7`, and the qualified `iPad4,4` Apple A7 target.
 
 ```text
 docs/

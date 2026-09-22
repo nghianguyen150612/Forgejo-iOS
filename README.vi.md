@@ -1,7 +1,7 @@
-# Forgejo iOS
+# Forgejo-iOS
 
-[![Installer lifecycle](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-installer.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-installer.yml)
-[![A7 runtime build](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml)
+[![Installer lifecycle](https://github.com/nghianguyen150612/Forgejo-iOS/actions/workflows/ios-installer.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/Forgejo-iOS/actions/workflows/ios-installer.yml)
+[![A7 runtime build](https://github.com/nghianguyen150612/Forgejo-iOS/actions/workflows/ios-forgejo-a7-runtime.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/Forgejo-iOS/actions/workflows/ios-forgejo-a7-runtime.yml)
 
 Chạy [Forgejo](https://forgejo.org/), dịch vụ Git tự quản lý, trực tiếp trên iPad đã jailbreak thuộc cấu hình được kiểm chứng. Bản port cộng đồng này đóng gói Forgejo **15.0.9**, SQLite và runtime **go1.26.7-a7**, kèm trình quản lý vòng đời luôn giữ dữ liệu người dùng theo mặc định. Đây không phải cam kết hỗ trợ iOS từ dự án Forgejo upstream.
 
@@ -22,7 +22,7 @@ Chạy [Forgejo](https://forgejo.org/), dịch vụ Git tự quản lý, trực 
 Chạy trong terminal trên iPad được hỗ trợ:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nghianguyen150612/forgejo-ios/ios/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/nghianguyen150612/Forgejo-iOS/ios/install.sh | sudo sh
 ```
 
 Chọn **1. Install Forgejo**. Menu đọc từ `/dev/tty`, nên vẫn hoạt động khi stdin nhận script qua pipe. Tài khoản chạy dịch vụ mặc định là người gọi sudo; nếu gọi trực tiếp bằng root thì dùng `mobile`. Tiến trình Forgejo không chạy bằng root.

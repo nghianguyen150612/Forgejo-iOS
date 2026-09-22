@@ -1,7 +1,7 @@
-# Forgejo iOS
+# Forgejo-iOS
 
-[![Installer lifecycle](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-installer.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-installer.yml)
-[![A7 runtime build](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/forgejo-ios/actions/workflows/ios-forgejo-a7-runtime.yml)
+[![Installer lifecycle](https://github.com/nghianguyen150612/Forgejo-iOS/actions/workflows/ios-installer.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/Forgejo-iOS/actions/workflows/ios-installer.yml)
+[![A7 runtime build](https://github.com/nghianguyen150612/Forgejo-iOS/actions/workflows/ios-forgejo-a7-runtime.yml/badge.svg?branch=ios)](https://github.com/nghianguyen150612/Forgejo-iOS/actions/workflows/ios-forgejo-a7-runtime.yml)
 
 Run [Forgejo](https://forgejo.org/), a self-hosted Git service, natively on a qualified jailbroken iPad. This community port packages Forgejo **15.0.9**, SQLite, and the **go1.26.7-a7** runtime with an installer that manages the application lifecycle and preserves user data by default. It is not an upstream Forgejo support statement.
 
@@ -23,7 +23,7 @@ Run [Forgejo](https://forgejo.org/), a self-hosted Git service, natively on a qu
 Run on the supported jailbroken iPad from a terminal:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nghianguyen150612/forgejo-ios/ios/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/nghianguyen150612/Forgejo-iOS/ios/install.sh | sudo sh
 ```
 
 Choose **1. Install Forgejo**. The installer reads choices from `/dev/tty`, so piped stdin is safe. The default service account is the user invoking sudo; when invoked directly as root it defaults to `mobile`. Forgejo itself never runs as root.

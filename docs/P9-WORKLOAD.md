@@ -1,4 +1,4 @@
-# Forgejo iOS Prompt 009 — Storage Scale and Git Workload Validation
+# Forgejo-iOS Prompt 009 — Storage Scale and Git Workload Validation
 
 Status: workload evidence collected on the primary iPad target; final source
 and CI handoff is recorded at the end of this document.

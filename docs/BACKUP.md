@@ -1,4 +1,4 @@
-# Forgejo iOS backup, restore, and migration
+# Forgejo-iOS backup, restore, and migration
 
 This document defines the P12 data-safety procedure for the native Forgejo
 runtime on the primary device:

@@ -1,4 +1,4 @@
-# Forgejo iOS P11 Performance Profile
+# Forgejo-iOS P11 Performance Profile
 
 Status: measured on the primary A7 device; no feature-removing runtime tuning
 was adopted.

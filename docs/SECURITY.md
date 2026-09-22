@@ -1,4 +1,4 @@
-# Forgejo iOS security and deployment boundary
+# Forgejo-iOS security and deployment boundary
 
 This document is the security contract for the native Forgejo deployment on
 the tested jailbroken iPad. It describes the boundary that this port can

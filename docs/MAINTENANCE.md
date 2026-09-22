@@ -1,6 +1,6 @@
-# Forgejo iOS Maintenance
+# Forgejo-iOS Maintenance
 
-This document defines the maintenance process for the frozen Forgejo iOS v1.0.0 release line.
+This document defines the maintenance process for the frozen Forgejo-iOS v1.0.0 release line.
 
 ## Frozen Release Matrix
 
@@ -59,7 +59,7 @@ Required evidence for a runtime update:
 - Source review of the runtime delta and the iOS arm64 patch scope.
 - Runtime probe confirming the expected low-level behavior before Forgejo qualification.
 - A7 validation on iPad4,4 or an explicitly documented replacement device matrix.
-- Production Forgejo iOS rebuild with fresh `build-info.txt`, `SHA256SUMS`, signature information, and runtime provenance.
+- Production Forgejo-iOS rebuild with fresh `build-info.txt`, `SHA256SUMS`, signature information, and runtime provenance.
 
 ## Release Rebuild Checklist
 

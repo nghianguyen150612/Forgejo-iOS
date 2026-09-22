@@ -1,11 +1,11 @@
-# Forgejo iOS installation and lifecycle
+# Forgejo-iOS installation and lifecycle
 
 The qualified target is `iPad4,4` / Apple A7 / iOS 12.5.7 / rootful Amethyst. The frozen release contains Forgejo 15.0.9 and go1.26.7-a7. This installer adds a POSIX lifecycle layer; it does not change Forgejo source, runtime patches, or the existing Bash launcher used by earlier manual deployments.
 
 ## Entry points and architecture
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nghianguyen150612/forgejo-ios/ios/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/nghianguyen150612/Forgejo-iOS/ios/install.sh | sudo sh
 ```
 
 `install.sh` downloads `scripts/ios/install-forgejo.sh` over HTTPS to a private temporary directory, verifies the engine's SHA-256 embedded in the bootstrap, and invokes `/bin/sh` with a file argument. Both scripts use POSIX shell only. All interactive reads use `/dev/tty`; nothing consumes menu input from the download pipe. An explicit command works without a terminal except `uninstall --purge`.
@@ -131,7 +131,7 @@ health/version/runtime facts and never config contents or credentials.
 The default release URL is:
 
 ```text
-https://github.com/nghianguyen150612/forgejo-ios/releases/download/v1.0.0-ios/
+https://github.com/nghianguyen150612/Forgejo-iOS/releases/download/v1.0.0-ios/
 ```
 
 The engine downloads `forgejo-ios` and `SHA256SUMS`. It accepts exactly one well-formed, path-free checksum entry for the executable, writes a selected checksum file in staging, and runs:

@@ -1,6 +1,6 @@
-# Forgejo iOS v1.0.0
+# Forgejo-iOS v1.0.0
 
-Status: Final v1.0.0 release metadata for the frozen Forgejo iOS A7 target.
+Status: Final v1.0.0 release metadata for the frozen Forgejo-iOS A7 target.
 
 ## Build identity
 

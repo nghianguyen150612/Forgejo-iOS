@@ -1,8 +1,8 @@
 # Changelog
 
-## Forgejo iOS v1.0.0 - 2026-09-20
+## Forgejo-iOS v1.0.0 - 2026-09-20
 
-Final release for the Forgejo iOS A7 validation target.
+Final release for the Forgejo-iOS A7 validation target.
 
 ### Added
 

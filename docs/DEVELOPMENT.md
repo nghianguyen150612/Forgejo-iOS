@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide summarizes how Forgejo iOS is organized, built, and validated. It is documentation for the frozen v1.0.0 release line and does not authorize product behavior changes.
+This guide summarizes how Forgejo-iOS is organized, built, and validated. It is documentation for the frozen v1.0.0 release line and does not authorize product behavior changes.
 
 ## Repository Structure
 

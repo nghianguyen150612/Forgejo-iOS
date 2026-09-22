@@ -1,4 +1,4 @@
-# Forgejo iOS port baseline and portability audit
+# Forgejo-iOS port baseline and portability audit
 
 Audit date: 2026-09-19
 
@@ -24,7 +24,7 @@ run on the target.
 - `main` remains unchanged at its existing upstream reference
   `1649d43c4e9373f3aee6fdea6b19041d0e177a25`.
 - `origin` is the GitHub repository
-  `https://github.com/nghianguyen150612/forgejo-ios.git`.
+  `https://github.com/nghianguyen150612/Forgejo-iOS.git`.
 - `upstream` is the official Codeberg repository
   `https://codeberg.org/forgejo/forgejo.git`.
 - `git fetch upstream --prune --tags` and `git fetch origin --prune` both
@@ -1222,7 +1222,7 @@ new P6 runtime directory at:
 With `GOMAXPROCS=1`, two consecutive server starts on port `39124` succeeded.
 Each run detected `/usr/bin/git` version `2.39.1`, enabled SQLite3 support,
 completed ORM initialization, listened on `127.0.0.1`, returned HTTP `200`
-with the `Forgejo iOS Prompt 006` page title, handled SIGTERM with wait status
+with the `Forgejo-iOS Prompt 006` page title, handled SIGTERM with wait status
 `0`, and left no orphan Forgejo process.
 
 ### Multi-P failure reproduction
