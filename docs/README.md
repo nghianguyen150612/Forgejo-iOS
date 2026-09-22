@@ -20,6 +20,7 @@ This directory contains the public operator, status, and maintenance documentati
 ## Evidence documents
 
 - [`PERFORMANCE.md`](PERFORMANCE.md) records resource and performance evidence.
+- [`DIAGNOSTICS.md`](DIAGNOSTICS.md) documents the read-only RAM/CPU and storage diagnostic scripts.
 - [`P9-WORKLOAD.md`](P9-WORKLOAD.md) records workload validation evidence.
 - [`../PORTING_IOS.md`](../PORTING_IOS.md) is the chronological porting and device-validation log.
 - [`../RELEASE.md`](../RELEASE.md) is the v1.0.0 release metadata and limitation summary.
@@ -29,7 +30,8 @@ This directory contains the public operator, status, and maintenance documentati
 1. Read [`STATUS.md`](STATUS.md) and [`../README.md`](../README.md) for scope.
 2. Read [`COMPATIBILITY.md`](COMPATIBILITY.md) before selecting a device.
 3. Read [`INSTALL.md`](INSTALL.md) before installing an artifact.
-4. Read [`SECURITY.md`](SECURITY.md) and [`SSH-TUNNELING.md`](SSH-TUNNELING.md) before remote access.
-5. Read [`BACKUP.md`](BACKUP.md), [`MAINTENANCE.md`](MAINTENANCE.md), and [`DEVELOPMENT.md`](DEVELOPMENT.md) before changing the deployment.
+4. Read [`DIAGNOSTICS.md`](DIAGNOSTICS.md) when collecting resource or storage observations.
+5. Read [`SECURITY.md`](SECURITY.md) and [`SSH-TUNNELING.md`](SSH-TUNNELING.md) before remote access.
+6. Read [`BACKUP.md`](BACKUP.md), [`MAINTENANCE.md`](MAINTENANCE.md), and [`DEVELOPMENT.md`](DEVELOPMENT.md) before changing the deployment.
 
 Do not commit runtime directories, databases, repositories, logs, private keys, credentials, cookies, or backup archives as documentation evidence.
