@@ -3,7 +3,7 @@ name: iOS runtime compatibility matrix
 on:
   push:
     branches:
-      - ios
+      - iOS
     paths:
       - '.github/workflows/ios-cgo-probe.yml'
       - 'PORTING_IOS.md'

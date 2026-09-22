@@ -2,7 +2,7 @@ name: iOS installer lifecycle
 
 on:
   push:
-    branches: [ios]
+    branches: [iOS]
     paths:
       - install.sh
       - scripts/ios/install-forgejo.sh
