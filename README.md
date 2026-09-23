@@ -110,7 +110,7 @@ requires the disposable P18 reboot and crash-recovery gate.
 
 Repair can recreate directories, restore managed permissions, restart the service, and recover a missing binary from a matching snapshot. It never resets configuration, repairs database contents, or deletes data.
 
-Ordinary uninstall stops Forgejo and removes its executable, lifecycle launcher, logs, and installer state. It keeps `data/`, `repositories/`, `custom/conf/`, and recovery backups. Reinstall can reuse this data.
+Ordinary uninstall stops Forgejo, unloads and removes the managed LaunchDaemon if present, and removes its executable, lifecycle launcher, logs, and installer state. It keeps `data/`, `repositories/`, `custom/conf/`, and recovery backups. Reinstall can reuse this data.
 
 To also delete persistent data and recovery backups:
 
