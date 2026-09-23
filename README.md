@@ -99,14 +99,18 @@ and runs the daemon as the configured non-root service account. The plist uses
 `RunAtLoad`, `KeepAlive`, a fixed `GOMAXPROCS=1` A7 environment, and only
 non-secret paths. `service stop` unloads the daemon and removes stale PID state;
 `service uninstall` removes only the managed plist and preserves the Forgejo
-configuration, database, repositories, logs, and backups. Before any service
-command can touch `/Library/LaunchDaemons`, `sudo -n id` must succeed.
+configuration, database, repositories, logs, and backups. Plain `start`, `stop`,
+and `restart` refuse to run while the managed LaunchDaemon plist exists, so a
+manual launcher cannot race launchd's `KeepAlive`. Update and repair operations
+quiesce a loaded LaunchDaemon before touching the binary and restore launchd
+supervision after validation. Before any service command can touch
+`/Library/LaunchDaemons`, `sudo -n id` must succeed.
 The host fixtures validate this path; enabling it on the qualified iPad still
 requires the disposable P18 reboot and crash-recovery gate.
 
 Repair can recreate directories, restore managed permissions, restart the service, and recover a missing binary from a matching snapshot. It never resets configuration, repairs database contents, or deletes data.
 
-Ordinary uninstall stops Forgejo and removes its executable, lifecycle launcher, logs, and installer state. It keeps `data/`, `repositories/`, `custom/conf/`, and recovery backups. Reinstall can reuse this data.
+Ordinary uninstall stops Forgejo, unloads and removes the managed LaunchDaemon if present, and removes its executable, lifecycle launcher, logs, and installer state. It keeps `data/`, `repositories/`, `custom/conf/`, and recovery backups. Reinstall can reuse this data.
 
 To also delete persistent data and recovery backups:
 

@@ -95,15 +95,19 @@ sudo forgejo-ios uninstall
 `service install` tạo nguyên tử và kiểm tra
 `/Library/LaunchDaemons/com.forgejo.ios.plist`, sau đó nạp bằng `launchctl`.
 Dịch vụ chạy bằng tài khoản không phải root đã cấu hình, tự khởi động sau boot
-và được launchd khởi động lại khi bị crash. Trước khi chạm vào thư mục hệ
-thống này, `sudo -n id` phải thành công. Lệnh stop gỡ daemon và xóa PID cũ;
-uninstall chỉ xóa plist, giữ nguyên cấu hình, SQLite, repository, log và backup.
+và được launchd khởi động lại khi bị crash. Khi plist LaunchDaemon được quản lý
+đang tồn tại, các lệnh `start`, `stop`, `restart` thủ công sẽ từ chối chạy để
+tránh xung đột với `KeepAlive`; hãy dùng nhóm lệnh `service`. Update và repair
+sẽ tạm unload LaunchDaemon trước khi thay đổi binary rồi khôi phục supervision
+sau khi kiểm tra thành công. Trước khi chạm vào thư mục hệ thống này,
+`sudo -n id` phải thành công. Lệnh service stop gỡ daemon và xóa PID cũ;
+service uninstall chỉ xóa plist, giữ nguyên cấu hình, SQLite, repository, log và backup.
 Các fixture trên host đã kiểm tra đường đi này; việc bật trên iPad vẫn cần vượt
 qua cổng kiểm chứng reboot và crash recovery của P18.
 
 Repair có thể tạo lại thư mục bị thiếu, khôi phục quyền của các mục do công cụ quản lý, khởi động lại dịch vụ và phục hồi binary bị mất từ bản sao có checksum phù hợp. Công cụ không đặt lại cấu hình, sửa nội dung cơ sở dữ liệu hay xóa dữ liệu.
 
-Gỡ thông thường dừng Forgejo rồi xóa binary, launcher, log và trạng thái cài đặt. Các thư mục `data/`, `repositories/`, `custom/conf/` và bản sao phục hồi được giữ nguyên. Cài lại có thể dùng tiếp dữ liệu này.
+Gỡ thông thường dừng Forgejo, unload và xóa LaunchDaemon được quản lý nếu có, rồi xóa binary, launcher, log và trạng thái cài đặt. Các thư mục `data/`, `repositories/`, `custom/conf/` và bản sao phục hồi được giữ nguyên. Cài lại có thể dùng tiếp dữ liệu này.
 
 Để xóa cả dữ liệu và bản sao phục hồi:
 

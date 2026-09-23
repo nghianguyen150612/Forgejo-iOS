@@ -119,6 +119,10 @@ permissions, owner-only runtime directories, and loopback configuration.
 `service stop` unloads the job before waiting for Forgejo and removes stale PID
 state without sending SIGKILL. `service uninstall` stops/unloads the job and
 removes only the plist; it never removes application data or configuration.
+While the managed plist exists, plain `start`, `stop`, and `restart` commands
+refuse to run so they cannot race launchd `KeepAlive`. Update and repair
+operations record whether launchd supervision was active, unload it before
+binary maintenance, and restore the prior supervisor after validation.
 
 Managed logs are below `logs/`: `forgejo.log` captures launchd standard output,
 `launcher.log` captures launcher/error output and startup/PID records, and
@@ -197,8 +201,8 @@ Diagnostics prints device identity, architecture, OS, jailbreak/tool context, va
 
 Repair recreates managed directories, restores managed permissions, restarts Forgejo, and restores a missing binary only from a snapshot matching `BINARY_SHA256`. It does not replace a present corrupt binary, reset config, edit database contents, or delete data. Normal Forgejo startup can write application data; that is not database repair.
 
-`uninstall` stops the owned process and removes the binary, manager, wrapper, default command link, logs, PID, and state. It retains configuration/data/repositories/backups. `uninstall --purge` additionally requires the exact phrase `DELETE FORGEJO DATA` on `/dev/tty` before deleting retained directories. Failed/missing confirmation leaves them intact; ordinary application removal has already occurred. There is no built-in undo.
+`uninstall` stops the owned process, unloads and removes the managed LaunchDaemon when present, and removes the binary, manager, wrapper, default command link, logs, PID, and state. It retains configuration/data/repositories/backups. `uninstall --purge` additionally requires the exact phrase `DELETE FORGEJO DATA` on `/dev/tty` before deleting retained directories. Failed/missing confirmation leaves them intact; ordinary application removal has already occurred. There is no built-in undo.
 
 ## Validation
 
-CI runs ShellCheck, `sh -n`, LaunchDaemon plist schema validation, the bootstrap engine-pin check, and `sh scripts/ios/install-forgejo.sh --self-test`. The isolated fixtures cover install, verify, update, failed-health rollback, prior running/stopped state, restored permissions/files, checksum refusal, missing-binary repair, uninstall, data preservation, managed-symlink refusal, and the service install/load/start/status/stop/restart/unload path. Signing/process/HTTP/launchd fixtures are mocks, not physical-device evidence. See [MAINTENANCE.md](MAINTENANCE.md) for device acceptance and release procedure.
+CI runs ShellCheck, `sh -n`, LaunchDaemon plist schema validation, the bootstrap engine-pin check, and `sh scripts/ios/install-forgejo.sh --self-test`. The isolated fixtures cover install, verify, update, failed-health rollback, prior running/stopped state, restored permissions/files, checksum refusal, missing-binary repair, uninstall, data preservation, managed-symlink refusal, manual/launchd supervisor conflict refusal, update while launchd is loaded, uninstall cleanup of the managed plist, and the service install/load/start/status/stop/restart/unload path. Signing/process/HTTP/launchd fixtures are mocks, not physical-device evidence. See [MAINTENANCE.md](MAINTENANCE.md) for device acceptance and release procedure.
