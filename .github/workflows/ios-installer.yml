@@ -5,12 +5,19 @@ on:
     branches: [iOS]
     paths:
       - install.sh
+      - README.md
+      - README.vi.md
+      - docs/INSTALL.md
       - scripts/ios/install-forgejo.sh
       - scripts/ios/validate-launchdaemon.sh
       - .github/workflows/ios-installer.yml
   pull_request:
+    branches: [iOS]
     paths:
       - install.sh
+      - README.md
+      - README.vi.md
+      - docs/INSTALL.md
       - scripts/ios/install-forgejo.sh
       - scripts/ios/validate-launchdaemon.sh
       - .github/workflows/ios-installer.yml
@@ -25,6 +32,23 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Canonical iOS branch references
+        run: |
+          set -eu
+          expected='https://raw.githubusercontent.com/nghianguyen150612/Forgejo-iOS/iOS/scripts/ios/install-forgejo.sh'
+          actual=$(sed -n 's/^engine_url=//p' install.sh)
+          [ "$actual" = "$expected" ] || {
+            printf 'unexpected engine_url: %s\n' "$actual" >&2
+            exit 1
+          }
+          if grep -Fn 'https://raw.githubusercontent.com/nghianguyen150612/Forgejo-iOS/ios/' README.md README.vi.md docs/INSTALL.md; then
+            printf '%s\n' 'lowercase ios branch found in installer documentation' >&2
+            exit 1
+          fi
+          if grep -Fn 'badge.svg?branch=ios' README.md README.vi.md; then
+            printf '%s\n' 'lowercase ios branch found in workflow badge' >&2
+            exit 1
+          fi
       - name: ShellCheck and POSIX syntax
         run: |
           shellcheck -s sh -S warning install.sh scripts/ios/install-forgejo.sh scripts/ios/validate-launchdaemon.sh
