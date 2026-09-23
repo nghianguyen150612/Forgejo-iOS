@@ -5,7 +5,7 @@ The qualified target is `iPad4,4` / Apple A7 / iOS 12.5.7 / rootful Amethyst. Th
 ## Entry points and architecture
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nghianguyen150612/Forgejo-iOS/ios/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/nghianguyen150612/Forgejo-iOS/iOS/install.sh | sudo sh
 ```
 
 `install.sh` downloads `scripts/ios/install-forgejo.sh` over HTTPS to a private temporary directory, verifies the engine's SHA-256 embedded in the bootstrap, and invokes `/bin/sh` with a file argument. Both scripts use POSIX shell only. All interactive reads use `/dev/tty`; nothing consumes menu input from the download pipe. An explicit command works without a terminal except `uninstall --purge`.
