@@ -38,7 +38,7 @@ init() {
     launchd_plist=$launchd_dir/$launchd_label.plist
     release=${FORGEJO_IOS_RELEASE:-v1.0.0-ios}
     case "$release" in ''|*[!a-zA-Z0-9._-]*|.*) die 'Invalid release tag.';; esac
-    stage='' lock_owned=0 active=0 previous='' was_running=0
+    stage='' lock_owned=0 active=0 previous='' was_running=0 launchd_was_installed=0 launchd_was_loaded=0
     trap cleanup 0
     trap 'exit 130' INT
     trap 'exit 143' TERM HUP
@@ -196,10 +196,13 @@ stop_service() {
     rm -f "$pidfile"
 }
 http_status() { curl --noproxy '*' --connect-timeout 2 --max-time 3 -s -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || :; }
+forgejo_process_exists() {
+    ps -axo command= | awk -v binary="$bin" '$1 == binary {found=1} END {exit !found}'
+}
 start_service() {
     if service_pid; then return 0; fi
     # Refuse to attribute a pre-existing listener or unmanaged process to this start.
-    if ps -axo command= | awk -v binary="$bin" '$1 == binary {found=1} END {exit !found}'; then
+    if forgejo_process_exists; then
         say 'Untracked Forgejo process; inspect it before restarting.' >&2; return 1
     fi
     [ "$(http_status)" = 000 ] || { say 'HTTP port is already occupied.' >&2; return 1; }
@@ -349,6 +352,45 @@ service_plist_matches() {
     done
     ! grep -Eiq 'password|token|private[[:space:]]+key|BEGIN (RSA|OPENSSH|EC|DSA|PRIVATE) KEY' "$launchd_plist"
 }
+managed_service_present() {
+    if [ ! -e "$launchd_plist" ] && [ ! -L "$launchd_plist" ]; then return 1; fi
+    [ -f "$launchd_plist" ] && [ ! -L "$launchd_plist" ] || die 'LaunchDaemon path exists but is not a regular managed plist.'
+    service_plist_syntax "$launchd_plist" || die 'Managed LaunchDaemon plist failed validation.'
+    service_plist_matches || die 'Existing com.forgejo.ios.plist is not managed by this installation.'
+}
+capture_service_state() {
+    if service_pid; then was_running=1; else was_running=0; fi
+    launchd_was_installed=0
+    launchd_was_loaded=0
+    if managed_service_present; then
+        launchd_was_installed=1
+        if service_loaded; then launchd_was_loaded=1; fi
+    fi
+}
+stop_for_maintenance() {
+    if managed_service_present; then
+        service_require_root
+        if service_loaded; then
+            service_launchctl unload "$launchd_plist" || return 1
+            service_wait_stopped || return 1
+        elif service_pid_status; then
+            stop_service || return 1
+        fi
+        if forgejo_process_exists; then
+            say 'Untracked Forgejo process remains after LaunchDaemon stop; maintenance refused.' >&2
+            return 1
+        fi
+    else
+        stop_service || return 1
+    fi
+}
+restore_saved_service_state() {
+    if [ "$launchd_was_loaded" = 1 ]; then
+        service_start || return 1
+    elif [ "$was_running" = 1 ]; then
+        start_service || return 1
+    fi
+}
 service_write_plist() {
     [ -d "$launchd_dir" ] || die "LaunchDaemon directory is missing: $launchd_dir"
     [ ! -L "$launchd_dir" ] || die 'LaunchDaemon directory must not be a symlink.'
@@ -424,6 +466,11 @@ service_start() {
     service_plist_syntax "$launchd_plist" || die 'Managed LaunchDaemon plist failed validation.'
     service_plist_matches || die 'Managed LaunchDaemon plist does not match this installation.'
     if ! service_loaded; then
+        if service_pid_status; then
+            stop_service || die 'Could not stop manually started Forgejo before LaunchDaemon start.'
+        elif forgejo_process_exists; then
+            die 'Untracked Forgejo process exists; LaunchDaemon start refused.'
+        fi
         service_launchctl load "$launchd_plist" || die 'LaunchDaemon load failed.'
     elif ! service_pid_status; then
         service_launchctl start "$launchd_label" || service_pid_status || die 'LaunchDaemon start failed.'
@@ -450,9 +497,12 @@ service_stop() {
     service_log_event stop "$old_pid"
     if service_loaded; then
         service_launchctl unload "$launchd_plist" || die 'LaunchDaemon unload failed.'
+        service_wait_stopped || die 'Forgejo did not stop after LaunchDaemon unload.'
     fi
     if service_pid_status; then
         stop_service || die 'Forgejo did not stop after LaunchDaemon unload.'
+    elif forgejo_process_exists; then
+        die 'Untracked Forgejo process remains after LaunchDaemon stop.'
     fi
     rm -f "$pidfile"
     service_log_event shutdown "$old_pid"
@@ -479,6 +529,11 @@ service_install() {
         service_log_event reload none
         service_launchctl unload "$launchd_plist" || die 'Existing LaunchDaemon unload failed.'
         service_wait_stopped || die 'Existing LaunchDaemon did not stop.'
+    elif service_pid_status; then
+        service_log_event transition "$pid"
+        stop_service || die 'Could not stop manually started Forgejo before LaunchDaemon install.'
+    elif forgejo_process_exists; then
+        die 'Untracked Forgejo process exists; LaunchDaemon install refused.'
     fi
     service_write_plist
     service_launchctl load "$launchd_plist" || die 'LaunchDaemon load failed.'
@@ -663,8 +718,10 @@ snapshot() {
         if [ -f "$root/bin/$item" ]; then cp -p "$root/bin/$item" "$previous/$item"; fi
     done
     if [ -f "$state" ]; then cp -p "$state" "$previous/install-state"; fi
-    if service_pid; then was_running=1; else was_running=0; fi
+    capture_service_state
     printf '%s\n' "$was_running" >"$previous/was-running"
+    printf '%s\n' "$launchd_was_installed" >"$previous/launchd-installed"
+    printf '%s\n' "$launchd_was_loaded" >"$previous/launchd-loaded"
     for item in . bin custom custom/conf data repositories logs backup run; do
         printf '%s %s %s\n' "$item" "$(owner "$root/$item")" "$(mode "$root/$item")"
     done >"$previous/permissions"
@@ -672,7 +729,7 @@ snapshot() {
     say "Recovery snapshot: $previous"
 }
 restore_snapshot() {
-    stop_service || return 1
+    stop_for_maintenance || return 1
     for item in forgejo manager.sh forgejo-ios; do
         if [ -f "$previous/$item" ]; then
             cp -p "$previous/$item" "$root/bin/.$item.restore" || return 1
@@ -690,7 +747,7 @@ restore_snapshot() {
         if [ "$(id -u)" = 0 ]; then chown "$saved_uid" "$root/$item" || return 1; fi
         chmod "$saved_mode" "$root/$item" || return 1
     done <"$previous/permissions"
-    if [ "$was_running" = 1 ]; then start_service || return 1; fi
+    restore_saved_service_state || return 1
 }
 cleanup() {
     result=$?
@@ -725,7 +782,7 @@ install_update() {
     for item in bin custom custom/conf data repositories logs backup run; do mkdir -p "$root/$item"; done
     snapshot
     active=1
-    stop_service || die 'Could not stop current service.'
+    stop_for_maintenance || die 'Could not stop current service safely for maintenance.'
     layout
     write_config
     check_config
@@ -736,10 +793,14 @@ install_update() {
     printf '#!/bin/sh\nexec /bin/sh "%s/bin/manager.sh" "$@"\n' "$root" >"$stage/command"
     chmod 755 "$stage/command"
     mv -f "$stage/command" "$root/bin/forgejo-ios"
-    start_service || die 'New binary did not become healthy.'
     printf 'VERSION=%s\nRELEASE=%s\nINSTALL_TIME=%s\nBINARY_SHA256=%s\n' "$version" "$release" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$(hash "$bin")" >"$stage/install-state"
     chmod 600 "$stage/install-state"
     mv -f "$stage/install-state" "$state"
+    if [ "$launchd_was_loaded" = 1 ]; then
+        service_start || die 'New binary did not become healthy under LaunchDaemon supervision.'
+    else
+        start_service || die 'New binary did not become healthy.'
+    fi
     if [ "$root" = /var/lib/forgejo-ios ]; then
         mkdir -p /usr/local/bin
         if [ -e "$link" ] || [ -L "$link" ]; then
@@ -814,6 +875,8 @@ diagnostics() {
 }
 repair() {
     check_device; check_paths; choose_user; check_config; lock
+    capture_service_state
+    stop_for_maintenance || die 'Could not stop current service safely for repair.'
     layout
     if [ ! -f "$bin" ]; then
         [ -f "$state" ] || die 'No state for authenticating a backup; manual recovery required.'
@@ -829,13 +892,21 @@ repair() {
     fi
     [ -f "$state" ] && [ "$(hash "$bin")" = "$(field "$state" BINARY_SHA256)" ] || die 'Binary mismatch; repair will not execute it.'
     chmod 755 "$bin"
-    if ! stop_service || ! start_service; then die 'Restart failed; data and config retained.'; fi
+    if [ "$launchd_was_loaded" = 1 ]; then
+        service_start || die 'LaunchDaemon restart failed; data and config retained.'
+    else
+        start_service || die 'Restart failed; data and config retained.'
+    fi
     say 'Repair PASS; no database, config content, or data was changed by repair.'
 }
 uninstall() {
     check_paths; choose_user; lock
     [ -f "$state" ] || [ -f "$root/bin/manager.sh" ] || die 'No managed installation; refusing deletion.'
-    stop_service || die 'Could not stop service; uninstall refused.'
+    if managed_service_present; then
+        service_uninstall
+    else
+        stop_service || die 'Could not stop service; uninstall refused.'
+    fi
     if [ "$root" = /var/lib/forgejo-ios ] && [ -L "$link" ] && [ "$(readlink "$link")" = "$root/bin/forgejo-ios" ]; then rm "$link"; fi
     rm -f "$bin" "$root/bin/manager.sh" "$root/bin/forgejo-ios" "$state" "$pidfile"
     rm -rf "$root/logs"
@@ -881,6 +952,9 @@ main() {
         service-run) shift; service_run "$@";;
         start|stop|restart)
             check_paths; choose_user; check_config; lock
+            if managed_service_present; then
+                die 'LaunchDaemon is installed; use forgejo-ios service start|stop|restart to avoid conflicting supervisors.'
+            fi
             if [ "$action" != stop ]; then
                 [ -f "$state" ] && [ -f "$bin" ] && [ "$(hash "$bin")" = "$(field "$state" BINARY_SHA256)" ] || die 'Installed checksum mismatch; startup refused.'
             fi
@@ -945,6 +1019,7 @@ case "${1:-}" in
         [ -f "$state" ]
         ;;
     load)
+        [ ! -f "$runtime/run/fixture-running" ] || exit 2
         touch "$state" "$runtime/run/fixture-running"
         ;;
     unload)
@@ -991,6 +1066,15 @@ FAKE_LAUNCHCTL
     [ ! -f "$test_runtime/run/fixture-running" ]
     /bin/sh "$test_engine" --fixture-step service-start "$test_root"
     /bin/sh "$test_engine" --fixture-step service-restart "$test_root"
+    if /bin/sh "$test_engine" --fixture-step stop "$test_root"; then die 'Expected plain stop refusal while LaunchDaemon is installed.'; fi
+    [ -f "$test_root/launchd.loaded" ] && [ -f "$test_runtime/run/fixture-running" ]
+    say 'PASS: plain lifecycle commands refuse to conflict with an installed LaunchDaemon'
+    printf 'release-launchd-update\n' >"$test_root/bundle/forgejo-ios"
+    (cd "$test_root/bundle" && sha256sum forgejo-ios >SHA256SUMS)
+    /bin/sh "$test_engine" --fixture-step update "$test_root"
+    cmp "$test_root/bundle/forgejo-ios" "$test_runtime/bin/forgejo"
+    [ -f "$test_root/launchd.loaded" ] && [ -f "$test_runtime/run/fixture-running" ]
+    say 'PASS: update quiesces and restores loaded LaunchDaemon supervision'
     /bin/sh "$test_engine" --fixture-step service-uninstall "$test_root"
     [ ! -e "$test_root/LaunchDaemons/com.forgejo.ios.plist" ]
     [ -f "$test_runtime/data/sentinel" ] && [ -f "$test_runtime/repositories/sentinel" ]
@@ -1049,13 +1133,16 @@ FAKE_FORGEJO
     rm "$test_runtime/bin/forgejo"
     /bin/sh "$test_engine" --fixture-step repair "$test_root"
     cmp "$test_root/binary-before" "$test_runtime/bin/forgejo"
+    /bin/sh "$test_engine" --fixture-step service-install "$test_root"
+    [ -f "$test_root/LaunchDaemons/com.forgejo.ios.plist" ] && [ -f "$test_root/launchd.loaded" ]
     /bin/sh "$test_engine" --fixture-step uninstall "$test_root"
+    [ ! -e "$test_root/LaunchDaemons/com.forgejo.ios.plist" ] && [ ! -e "$test_root/launchd.loaded" ]
     [ ! -e "$test_runtime/bin/forgejo" ] && [ ! -e "$test_runtime/bin/manager.sh" ]
     [ ! -e "$test_runtime/install-state" ] && [ ! -e "$test_runtime/logs" ]
     cmp "$test_root/config-before" "$test_runtime/custom/conf/app.ini"
     [ "$(cat "$test_runtime/data/sentinel")" = 'retained data' ]
     [ "$(cat "$test_runtime/repositories/sentinel")" = 'retained repository' ]
-    say 'PASS: uninstall and data/config/repository preservation'
+    say 'PASS: uninstall removes managed LaunchDaemon and preserves data/config/repositories'
     ln -s "$test_root/bundle" "$test_runtime/bin/forgejo"
     if /bin/sh "$test_engine" --fixture-step install "$test_root"; then die 'Expected symlink refusal.'; fi
     say 'PASS: managed symlink refusal'
