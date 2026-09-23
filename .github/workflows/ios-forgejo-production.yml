@@ -18,6 +18,23 @@ on:
       - 'services/**'
       - 'scripts/ios/**'
       - 'tools/**'
+  pull_request:
+    branches:
+      - iOS
+    paths:
+      - '.github/workflows/ios-forgejo-production.yml'
+      - 'Makefile'
+      - 'PORTING_IOS.md'
+      - 'go.mod'
+      - 'go.sum'
+      - 'main.go'
+      - 'cmd/**'
+      - 'modules/**'
+      - 'models/**'
+      - 'routers/**'
+      - 'services/**'
+      - 'scripts/ios/**'
+      - 'tools/**'
   workflow_dispatch:
 
 permissions:
