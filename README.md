@@ -103,8 +103,9 @@ configuration, database, repositories, logs, and backups. Plain `start`, `stop`,
 and `restart` refuse to run while the managed LaunchDaemon plist exists, so a
 manual launcher cannot race launchd's `KeepAlive`. Update and repair operations
 quiesce a loaded LaunchDaemon before touching the binary and restore launchd
-supervision after validation. Before any service command can touch
-`/Library/LaunchDaemons`, `sudo -n id` must succeed.
+supervision after validation. Service-control commands must already be running
+as UID 0; invoking the manager through `sudo` or from an existing root shell is
+accepted, with no redundant nested `sudo -n` preflight.
 The host fixtures validate this path; enabling it on the qualified iPad still
 requires the disposable P18 reboot and crash-recovery gate.
 
