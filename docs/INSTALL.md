@@ -113,8 +113,10 @@ sudo forgejo-ios service restart
 sudo forgejo-ios service uninstall
 ```
 
-`service install` requires the non-interactive root check before it touches
-`/Library/LaunchDaemons`. It also checks the binary checksum, config and state
+`service install` requires the manager process itself to run as UID 0 before it
+touches `/Library/LaunchDaemons`; invoke it through `sudo` or from an existing
+root shell. It does not perform a redundant nested `sudo -n id` check once it
+is already root. It also checks the binary checksum, config and state
 permissions, owner-only runtime directories, and loopback configuration.
 `service stop` unloads the job before waiting for Forgejo and removes stale PID
 state without sending SIGKILL. `service uninstall` stops/unloads the job and
