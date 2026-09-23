@@ -10,7 +10,7 @@ Forgejo-iOS is intentionally progressing in small, evidence-driven steps. The v1
 
 ## Next: close the device-service gate
 
-1. Obtain a controlled non-interactive root path on the target device.
+1. Enter a controlled UID-0 context on the target device (through `sudo` or an existing root shell).
 2. Install the managed rootful LaunchDaemon in a disposable runtime.
 3. Verify `launchctl` status, process ownership, listener address, and SQLite integrity.
 4. Reboot once and record whether `RunAtLoad` starts the service.
@@ -22,7 +22,7 @@ A failed or unavailable step remains **not tested**; it is not converted into a 
 ## Then: strengthen the qualified A7 profile
 
 - Repeat clean-install, update, rollback, backup, restore, and uninstall checks on the target.
-- Record bounded CPU, RSS, storage, startup, and workload observations.
+- Preserve and extend the bounded CPU, RSS, storage, startup, and workload observations already recorded in `docs/P9-WORKLOAD.md`.
 - Test Git clone/fetch/push, hooks, SSH transport, and cancellation using disposable repositories.
 - Document optional features separately instead of assuming that Linux-oriented PAM, systemd, sendmail, or external renderers work on iOS.
 
