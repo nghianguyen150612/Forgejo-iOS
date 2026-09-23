@@ -232,9 +232,7 @@ start_service() {
     return 1
 }
 service_require_root() {
-    [ "$(id -u)" = 0 ] || die 'LaunchDaemon service commands require root.'
-    command -v sudo >/dev/null 2>&1 || die 'sudo is required before touching /Library/LaunchDaemons.'
-    sudo -n id >/dev/null 2>&1 || die 'sudo -n id must succeed before touching /Library/LaunchDaemons.'
+    [ "$(id -u)" = 0 ] || die 'LaunchDaemon service commands require UID 0; invoke through sudo or an existing root shell.'
     [ -n "$launchctl_bin" ] || die 'launchctl is unavailable; service mode is not supported on this system.'
     if ! command -v plutil >/dev/null 2>&1 && ! command -v xmllint >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
         die 'A plist/XML validator (plutil, xmllint, or python3) is required for service mode.'
