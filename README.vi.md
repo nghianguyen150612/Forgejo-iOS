@@ -99,8 +99,9 @@ và được launchd khởi động lại khi bị crash. Khi plist LaunchDaemon
 đang tồn tại, các lệnh `start`, `stop`, `restart` thủ công sẽ từ chối chạy để
 tránh xung đột với `KeepAlive`; hãy dùng nhóm lệnh `service`. Update và repair
 sẽ tạm unload LaunchDaemon trước khi thay đổi binary rồi khôi phục supervision
-sau khi kiểm tra thành công. Trước khi chạm vào thư mục hệ thống này,
-`sudo -n id` phải thành công. Lệnh service stop gỡ daemon và xóa PID cũ;
+sau khi kiểm tra thành công. Các lệnh quản lý LaunchDaemon phải được chạy sẵn
+với UID 0; có thể gọi manager qua `sudo` hoặc từ root shell hiện có, không còn
+bắt buộc chạy thêm `sudo -n` lồng bên trong. Lệnh service stop gỡ daemon và xóa PID cũ;
 service uninstall chỉ xóa plist, giữ nguyên cấu hình, SQLite, repository, log và backup.
 Các fixture trên host đã kiểm tra đường đi này; việc bật trên iPad vẫn cần vượt
 qua cổng kiểm chứng reboot và crash recovery của P18.
