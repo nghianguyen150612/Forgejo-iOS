@@ -12,6 +12,17 @@ on:
       - 'scripts/ios/**'
       - 'tools/ios-cgo-probe/**'
       - 'tools/ios-runtime-probes/**'
+  pull_request:
+    branches:
+      - iOS
+    paths:
+      - '.github/workflows/ios-cgo-probe.yml'
+      - 'PORTING_IOS.md'
+      - 'go.mod'
+      - 'go.sum'
+      - 'scripts/ios/**'
+      - 'tools/ios-cgo-probe/**'
+      - 'tools/ios-runtime-probes/**'
   workflow_dispatch:
 
 permissions:
