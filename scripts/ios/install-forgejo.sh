@@ -532,7 +532,8 @@ service_install() {
     elif service_pid_status; then
         service_log_event transition "$pid"
         stop_service || die 'Could not stop manually started Forgejo before LaunchDaemon install.'
-    elif forgejo_process_exists; then
+    fi
+    if forgejo_process_exists; then
         die 'Untracked Forgejo process exists; LaunchDaemon install refused.'
     fi
     service_write_plist
@@ -989,6 +990,10 @@ fixture_step() {
         touch "$root/run/fixture-running"
     }
     http_status() { say 200; }
+    service_wait_running() {
+        if [ -f "$root/data/fail-launchd-once" ]; then rm -f "$root/data/fail-launchd-once"; return 1; fi
+        service_pid_status && [ "$(http_status)" = 200 ]
+    }
     as_user() { "$@"; }
     case "$1" in
         service-install) main service install;;
@@ -1075,6 +1080,16 @@ FAKE_LAUNCHCTL
     cmp "$test_root/bundle/forgejo-ios" "$test_runtime/bin/forgejo"
     [ -f "$test_root/launchd.loaded" ] && [ -f "$test_runtime/run/fixture-running" ]
     say 'PASS: update quiesces and restores loaded LaunchDaemon supervision'
+    cp -p "$test_runtime/bin/forgejo" "$test_root/launchd-binary-before"
+    cp -p "$test_runtime/install-state" "$test_root/launchd-state-before"
+    printf 'release-launchd-failure\n' >"$test_root/bundle/forgejo-ios"
+    (cd "$test_root/bundle" && sha256sum forgejo-ios >SHA256SUMS)
+    touch "$test_runtime/data/fail-launchd-once"
+    if /bin/sh "$test_engine" --fixture-step update "$test_root"; then die 'Expected LaunchDaemon health failure.'; fi
+    cmp "$test_root/launchd-binary-before" "$test_runtime/bin/forgejo"
+    cmp "$test_root/launchd-state-before" "$test_runtime/install-state"
+    [ -f "$test_root/launchd.loaded" ] && [ -f "$test_runtime/run/fixture-running" ]
+    say 'PASS: failed LaunchDaemon update rolls back binary/state and restores supervision'
     /bin/sh "$test_engine" --fixture-step service-uninstall "$test_root"
     [ ! -e "$test_root/LaunchDaemons/com.forgejo.ios.plist" ]
     [ -f "$test_runtime/data/sentinel" ] && [ -f "$test_runtime/repositories/sentinel" ]
