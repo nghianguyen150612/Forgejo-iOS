@@ -1,6 +1,6 @@
 # Project status
 
-Last reviewed: 2026-09-22
+Last reviewed: 2026-09-24
 
 This page is the concise status view for Forgejo-iOS. It separates repository evidence from assumptions and device work that has not yet been completed. The detailed evidence log remains in [`PORTING_IOS.md`](../PORTING_IOS.md).
 
@@ -18,7 +18,7 @@ This page is the concise status view for Forgejo-iOS. It separates repository ev
 
 The following claims have repository evidence:
 
-- The current `iOS` baseline is commit `5b064e32f9ec09842d874b6fd0e1144e84c2924f`.
+- The maintained baseline is the repository's `iOS` branch; frozen-release source identity is recorded separately in the release `build-info.txt` provenance instead of being hard-coded here.
 - The target device identity has been observed as iPad mini 2 / `iPad4,4` / Apple A7 / arm64 / iOS 12.5.7 / Darwin 18.7.0.
 - Apple physical-iOS arm64 Mach-O probes build in GitHub Actions with the documented Xcode/iPhoneOS toolchain.
 - Native C and Go 1.26.7 pure-Go/CGO probes execute on the target after the empirically required device-side signing treatment.
@@ -35,14 +35,14 @@ These features exist in the repository but must not be treated as device-qualifi
 - LaunchDaemon start/stop/restart behavior while preserving SQLite and HTTP health.
 - Any claim of automatic startup or indefinite service availability on the iPad.
 
-The earlier physical acceptance run was blocked because non-interactive `sudo` on the iPad required a password. Host fixtures do not substitute for those device checks.
+The earlier physical acceptance run was blocked by a redundant nested `sudo -n` preflight. The lifecycle manager now accepts an invocation that is already UID 0 (whether reached through `sudo` or an existing root shell). The LaunchDaemon path still requires a fresh physical-device reboot/crash acceptance run; host fixtures do not substitute for those device checks.
 
 ## Planned
 
 - Complete the disposable physical-device LaunchDaemon gate without touching real user data.
 - Re-run the manual Forgejo lifecycle and SQLite/HTTP checks from a clean, documented device runtime.
 - Expand the device matrix only after each combination has its own build, signing, runtime, and cleanup evidence.
-- Measure bounded A7 resource behavior and document workload limits; do not promise indefinite uptime, thermal, battery, or capacity behavior.
+- Keep the existing bounded A7 workload/resource evidence current when the release/runtime matrix changes; do not promote it into indefinite uptime, thermal, battery, or capacity guarantees.
 - Reassess the frozen Forgejo/runtime pair through a separate upgrade cycle rather than changing the v1.0.0 qualification in place.
 
 ## Status vocabulary
