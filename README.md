@@ -99,8 +99,12 @@ and runs the daemon as the configured non-root service account. The plist uses
 `RunAtLoad`, `KeepAlive`, a fixed `GOMAXPROCS=1` A7 environment, and only
 non-secret paths. `service stop` unloads the daemon and removes stale PID state;
 `service uninstall` removes only the managed plist and preserves the Forgejo
-configuration, database, repositories, logs, and backups. Before any service
-command can touch `/Library/LaunchDaemons`, `sudo -n id` must succeed.
+configuration, database, repositories, logs, and backups. Plain `start`, `stop`,
+and `restart` refuse to run while the managed LaunchDaemon plist exists, so a
+manual launcher cannot race launchd's `KeepAlive`. Update and repair operations
+quiesce a loaded LaunchDaemon before touching the binary and restore launchd
+supervision after validation. Before any service command can touch
+`/Library/LaunchDaemons`, `sudo -n id` must succeed.
 The host fixtures validate this path; enabling it on the qualified iPad still
 requires the disposable P18 reboot and crash-recovery gate.
 
