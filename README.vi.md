@@ -147,6 +147,20 @@ Chạy `sudo forgejo-ios diagnostics` để xem thiết bị, checksum, runtime,
 
 Bằng chứng port: [PORTING_IOS.md](PORTING_IOS.md). Artifact: [RELEASE.md](RELEASE.md). Bảo mật: [docs/SECURITY.md](docs/SECURITY.md). Mục lục: [docs/README.md](docs/README.md).
 
+## Duy trì nhánh upstream
+
+Repository giữ hai luồng phát triển riêng biệt:
+
+- `main` là nhánh tham chiếu upstream-only, mirror branch `forgejo` chính thức từ `https://codeberg.org/forgejo/forgejo.git`.
+- `iOS` là nhánh Forgejo-iOS được duy trì và vẫn là default branch.
+- Đồng bộ `main` **không** tự nâng phiên bản Forgejo đang dùng trên `iOS`; release upstream mới phải được port và kiểm chứng riêng.
+
+Trên GitHub Mobile hoặc github.com, đồng bộ `main` bằng:
+
+**Actions → Sync Forgejo upstream to main → Run workflow → Run workflow**
+
+Workflow chỉ fast-forward `main`. Nếu `main` đã diverge khỏi upstream chính thức, workflow sẽ fail mà không force-push và không sửa `iOS`.
+
 ## Giấy phép
 
 Forgejo dùng [GNU GPL v3.0 hoặc mới hơn](LICENSE). Các phiên bản trước v9.0 dùng MIT. Xem [CONTRIBUTING.md](CONTRIBUTING.md) về đóng góp upstream.
