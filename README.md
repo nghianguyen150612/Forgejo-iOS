@@ -150,6 +150,20 @@ Run `sudo forgejo-ios diagnostics` for device, checksum, runtime, configuration 
 
 Build evidence: [PORTING_IOS.md](PORTING_IOS.md). Frozen artifacts: [RELEASE.md](RELEASE.md). Security: [docs/SECURITY.md](docs/SECURITY.md). Documentation index: [docs/README.md](docs/README.md).
 
+## Upstream branch maintenance
+
+The repository keeps two distinct lines of development:
+
+- `main` is an upstream-only reference that mirrors the official Forgejo `forgejo` branch from `https://codeberg.org/forgejo/forgejo.git`.
+- `iOS` is the maintained Forgejo-iOS port and remains the default branch.
+- Synchronizing `main` does **not** update the Forgejo version used by `iOS`. Upstream releases must be ported and qualified separately.
+
+From GitHub Mobile or github.com, synchronize `main` with:
+
+**Actions → Sync Forgejo upstream to main → Run workflow → Run workflow**
+
+The workflow only fast-forwards `main`. If `main` diverges from official upstream, it fails without force-pushing or modifying `iOS`.
+
 ## License
 
 Forgejo is licensed under [GNU GPL v3.0 or later](LICENSE). Versions before v9.0 used the MIT license. See [CONTRIBUTING.md](CONTRIBUTING.md) for upstream contribution guidance.
