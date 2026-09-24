@@ -41,6 +41,14 @@ Forgejo is distributed under the terms of the [GPL version 3.0](LICENSE) or any 
 
 The agreement for this license [was documented in June 2023](https://codeberg.org/forgejo/governance/pulls/24) and implemented during the development of Forgejo v9.0. All Forgejo versions before v9.0 are distributed under the MIT license.
 
+## Repository & Branch Maintenance
+
+- **`iOS`**: The maintained Forgejo-iOS port branch and default repository branch.
+- **`main`**: An upstream-only reference branch mirroring official Forgejo (`forgejo` branch at `https://codeberg.org/forgejo/forgejo.git`).
+- **Upstream Synchronization**: Syncing `main` with official upstream does **not** update the Forgejo version used by `iOS`. An upstream release or update must be ported and tested separately before being incorporated into `iOS`.
+- **Syncing `main` from GitHub Mobile / Web UI**:
+  Go to **Actions** → **Sync Forgejo upstream to main** → **Run workflow** → **Run workflow**.
+
 ## Get involved
 
 If you are interested in making Forgejo better, either by reporting a bug or by changing the governance, please [take a look at the contribution guide](CONTRIBUTING.md).

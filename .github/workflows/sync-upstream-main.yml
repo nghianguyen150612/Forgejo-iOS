@@ -1,0 +1,88 @@
+name: Sync Forgejo upstream to main
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sync-upstream-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync upstream main
+        run: |
+          set -e
+
+          UPSTREAM_URL="https://codeberg.org/forgejo/forgejo.git"
+          UPSTREAM_BRANCH="forgejo"
+          DEST_BRANCH="main"
+
+          # Configure upstream remote
+          git remote add upstream "$UPSTREAM_URL" 2>/dev/null || git remote set-url upstream "$UPSTREAM_URL"
+
+          # Explicitly fetch authoritative refs
+          echo "Fetching origin/${DEST_BRANCH} and upstream/${UPSTREAM_BRANCH}..."
+          git fetch origin "$DEST_BRANCH"
+          git fetch upstream "$UPSTREAM_BRANCH"
+
+          MAIN_SHA=$(git rev-parse "origin/$DEST_BRANCH")
+          UPSTREAM_SHA=$(git rev-parse "upstream/$UPSTREAM_BRANCH")
+
+          echo "Previous main SHA: $MAIN_SHA"
+          echo "Upstream Forgejo SHA: $UPSTREAM_SHA"
+
+          # Write initial summary info
+          echo "### Sync Forgejo upstream to main" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous main SHA:** \`$MAIN_SHA\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Upstream Forgejo SHA:** \`$UPSTREAM_SHA\`" >> $GITHUB_STEP_SUMMARY
+
+          # Case A: Already synchronized
+          if [ "$MAIN_SHA" = "$UPSTREAM_SHA" ]; then
+            echo "main is already up to date with Forgejo upstream"
+            echo "- **Result:** Already up to date" >> $GITHUB_STEP_SUMMARY
+            echo "- **New main SHA:** \`$MAIN_SHA\`" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # Case B: main is behind upstream (fast-forwardable)
+          if git merge-base --is-ancestor "$MAIN_SHA" "$UPSTREAM_SHA"; then
+            echo "origin/main is an ancestor of upstream/forgejo. Fast-forwarding main..."
+            BEHIND_COUNT=$(git rev-list --count "$MAIN_SHA..$UPSTREAM_SHA")
+            echo "main is $BEHIND_COUNT commit(s) behind upstream."
+
+            # Fast-forward main ref directly on origin without force push or merge commit
+            git push origin "$UPSTREAM_SHA:refs/heads/$DEST_BRANCH"
+
+            NEW_MAIN_SHA=$(git rev-parse "origin/$DEST_BRANCH" 2>/dev/null || echo "$UPSTREAM_SHA")
+            echo "Successfully fast-forwarded main to $NEW_MAIN_SHA"
+
+            echo "- **Result:** Fast-forwarded ($BEHIND_COUNT commits ahead)" >> $GITHUB_STEP_SUMMARY
+            echo "- **New main SHA:** \`$NEW_MAIN_SHA\`" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # Case C: Branches diverged
+          echo "::error::origin/main has diverged from upstream/forgejo!"
+          AHEAD_COUNT=$(git rev-list --count "$UPSTREAM_SHA..$MAIN_SHA" 2>/dev/null || echo "unknown")
+          BEHIND_COUNT=$(git rev-list --count "$MAIN_SHA..$UPSTREAM_SHA" 2>/dev/null || echo "unknown")
+
+          echo "Diagnostics:"
+          echo "Current main SHA: $MAIN_SHA"
+          echo "Upstream Forgejo SHA: $UPSTREAM_SHA"
+          echo "Commits unique to main (ahead): $AHEAD_COUNT"
+          echo "Commits unique to upstream (behind): $BEHIND_COUNT"
+
+          echo "- **Result:** Refused because diverged" >> $GITHUB_STEP_SUMMARY
+          echo "- **Diagnostics:** main is $AHEAD_COUNT commit(s) ahead and $BEHIND_COUNT commit(s) behind upstream." >> $GITHUB_STEP_SUMMARY
+          echo "Refusing to modify main due to divergence."
+          exit 1
