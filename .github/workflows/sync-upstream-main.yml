@@ -2,6 +2,11 @@ name: Sync Forgejo upstream to main
 
 on:
   workflow_dispatch:
+  # Temporary validation trigger. Removed after this corrected workflow passes once.
+  push:
+    branches: [iOS]
+    paths:
+      - .github/workflows/sync-upstream-main.yml
 
 concurrency:
   group: sync-upstream-main
