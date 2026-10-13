@@ -9,7 +9,7 @@ on:
     paths:
       - '.github/workflows/sync-upstream-main.yml'
   schedule:
-    - cron: '17 8 * * 1'
+    - cron: '0 7 * * 1'
       timezone: 'Asia/Ho_Chi_Minh'
 
 concurrency:
