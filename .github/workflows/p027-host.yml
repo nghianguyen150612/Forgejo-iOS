@@ -24,4 +24,4 @@ jobs:
       - name: Unit and SQLite fixture checks
         run: go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/issues ./routers/api/packages/nuget ./services/auth ./services/authz
       - name: API and workflow trust integration checks
-        run: make 'test-sqlite#Test(APIModifyLabels|PackageNuGet|ActionsForkPullRequest)'
+        run: make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(APIModifyLabels|PackageNuGet|ActionsForkPullRequest)'"
