@@ -87,3 +87,101 @@ ab1427f90e8c679bab286e70c3ea526d68084bbc fix: prevent deletion of labels from or
  tests/integration/api_packages_nuget_test.go |  14 +
  14 files changed, 748 insertions(+), 38 deletions(-)
 ```
+
+Additional audit limitation: development-line git cherry produced 56 entries,
+including 20 patch-equivalent baseline patches, before GitHub's promisor fetch
+returned HTTP 503 for blob 7bcafa7ae2d8c0f5c877823550f40449d391ed7b.
+Only those completed equivalences are marked ALREADY PORTED in the development
+inventory. Full development-line semantic/equivalence audit remains BLOCKED.
+
+Native CI correction: initial macOS PR jobs failed at checkout because iOS and
+ios/* remote refs collide on a case-insensitive filesystem (run 42781284715).
+Commit 29ffe92950b18d97026a01580c7eddb388ebe4a6 fetches only the immutable
+candidate SHA at depth 1 in both native workflows. Explicit native version
+pins and build/runtime contracts remain unchanged. Follow-up CI is pending.
+
+
+## Host validation (Linux, stock Go 1.27.1)
+
+| Result | Command / scope | Outcome |
+| --- | --- | --- |
+| PASS | `go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/issues ./routers/api/packages/nuget ./services/auth ./services/authz` | exit 0; issues 24.703s, authz 1.543s; NuGet compiles with no package-local tests; auth 1.481s with no runnable tests |
+| PASS | `go build -p 2 -tags='sqlite sqlite_unlock_notify' -o /workspace/scratch/forgejo-p027 .` | exit 0; host executable built |
+| PASS | `make backend TAGS='sqlite sqlite_unlock_notify'` | exit 0; generated fixture backend required by integration subprocesses |
+| PASS | `go mod verify` | all modules verified |
+| PASS | `scripts/ios/validate-launchdaemon.sh --self-test` | plist validator fixtures passed |
+| PASS | `sh scripts/ios/install-forgejo.sh --self-test` | all mock lifecycle fixtures passed; no real installation |
+| PASS | `git diff --check` | exit 0 |
+| BLOCKED | `scripts/ios/build-forgejo.sh /workspace/scratch/forgejo-p027-ios` | local preflight exit 1, xcrun unavailable |
+| FAIL | `govulncheck -tags=sqlite,sqlite_unlock_notify ./...` (v1.9.0) | process killed, exit 137; no completed symbol-level result |
+| FAIL | `govulncheck -scan=module` | exit 3; 20 module/host-standard-library advisories, reachability not determined |
+| NOT RUN | full repository suites, local race and full historical migration suites | this batch changes access checks, not schema; selected tests use synthetic SQLite/Git fixtures |
+| DEFERRED | all device gates | OWNER APPROVED |
+
+The module scanner reports the following advisory IDs (this is NOT a claim
+that each is callable from the iOS executable):
+
+GO-2026-6905, GO-2026-6888, GO-2026-6866, GO-2026-6865, GO-2026-6860, GO-2026-6809, GO-2026-6617, GO-2026-6613, GO-2026-6612, GO-2026-6611, GO-2026-6610, GO-2026-6609, GO-2026-6608, GO-2026-6607, GO-2026-6605, GO-2026-6604, GO-2026-6603, GO-2026-6600, GO-2026-6599, GO-2026-5932.
+
+The module scan includes stock host Go 1.27.1, not the custom iOS Go 1.26.7
+runtime. Its findings prioritize the next dependency/runtime batch; the full
+symbol scan must be repeated with adequate resources. An initial module-scan
+invocation with patterns exited 2 (module mode rejects patterns); the corrected
+invocation above completed and returned actual advisory findings.
+
+Initial integration invocations FAILED before executing tests: the Makefile
+pattern target did not quote a combined regex; after quoting via
+GOTESTCOMPILEDRUNSUFFIX, the harness required a root `gitea` binary. CI commits
+401db438a and 67fa81564 correct the invocation and backend prerequisite without
+changing test coverage or assertions. Final integration outcome follows.
+
+Hosted evidence at source commit 401db438a: pristine iOS production build PASS
+(run 42782313370); Linux stock regression PASS (42782313913). Custom A7 runtime
+job remains pending. Initial macOS checkout failures and the earlier host-CI
+invocation failures remain historical FAIL results; newer jobs are separate
+attempts. The final documentation/host-workflow commits require their own CI
+completion and are not silently covered by older exact-SHA evidence.
+
+Draft PR: https://github.com/nghianguyen150612/Forgejo-iOS/pull/10
+Host qualification: BLOCKED for full acceptance by unresolved dependency
+advisories, symbol scan resource failure, development mapping and outstanding
+A7/native gates. Selected host checks above PASS only within their scope.
+Device qualification: DEFERRED — OWNER APPROVED.
+
+Additional implementation/CI files beyond the initial inventory:
+.github/workflows/ios-forgejo-a7-runtime.yml,
+.github/workflows/ios-forgejo-production.yml, and
+.github/workflows/p027-host.yml (backend prerequisite and quoted run flags).
+No scheduled synchronization workflow changed.
+
+## Final integration results
+
+FAIL: `make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(APIModifyLabels|PackageNuGet|ActionsForkPullRequest)'"`
+with the backend fixture built: exit 2 from make. Actions trust completed all
+32 event scenarios (55.572s), and label checks completed without failures.
+The only reported test failure was the existing NuGet symbol-package byte-size
+assertion at api_packages_nuget_test.go:381: expected 616, actual 618 on host
+Go 1.27.1. Toolchain sensitivity is a hypothesis; exact Go 1.26.7 CI remains
+the comparison gate. The full combined run remains FAIL, and no assertion was
+changed, test removed, or toolchain/dependency downgraded to hide it.
+
+A first isolated token-scope selection also FAILED: it omitted the required
+package upload fixture, so valid-token GET returned 404. With the upload
+prerequisite included, the narrow security check PASSED (exit 0):
+
+```sh
+GITEA_ROOT=/workspace/Forgejo-iOS GITEA_CONF=tests/sqlite.ini \
+  ./integrations.sqlite.test -test.v \
+  -test.run '^TestPackageNuGet$/^(Upload|PackageService)$/^(DependencyPackage|validate_token_scope)$'
+```
+
+This verifies the valid-token path and rejection of repository-only scopes;
+it does not convert the separate symbol-package failure into a PASS. The CI
+workflow retains the full combined test selection, including that assertion.
+
+Next steps in order: confirm/fix symbol-package byte-size portability using
+exact supported Go evidence; complete host security/native CI; port security
+dependency upgrades and the official ar mirror with full symbol scans; qualify
+A7 toolchain updates; then remaining v15 fixes and development-line mapping.
+Final qualification remains BLOCKED; the Draft PR is reviewable implementation,
+not a completed upstream port or a release candidate.
