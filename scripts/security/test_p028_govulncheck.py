@@ -20,7 +20,8 @@ class ScanEvidenceTests(unittest.TestCase):
             (source / 'tracked-marker').write_text('exact source')
             subprocess.run(['git', 'add', '.'], cwd=source, check=True)
             subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'], cwd=source, check=True)
-            (source / 'untracked-toolchain-test.go').write_text('deliberately invalid')
+            if case != 'clean-worktree':
+                (source / 'untracked-toolchain-test.go').write_text('deliberately invalid')
             go = binaries / 'go'
             go.write_text('''#!/usr/bin/env python3
 import json, os, pathlib, sys
@@ -49,7 +50,7 @@ if case == 'advisory':
             go.chmod(0o755)
             tool.chmod(0o755)
             env = {**os.environ, 'PATH': str(binaries) + os.pathsep + os.environ['PATH'], 'SCAN_FIXTURE_CASE': case}
-            output = root / 'evidence'
+            output = source / 'build' / 'security' / 'p028'
             result = subprocess.run(['python3', str(SCANNER), '--output', str(output), '--tool', str(tool)], cwd=source, env=env, capture_output=True, text=True)
             self.assertTrue((output / 'report.json').is_file(), result.stderr)
             return result.returncode, json.loads((output / 'report.json').read_text())
@@ -58,9 +59,15 @@ if case == 'advisory':
         code, report = self.run_case('clean')
         self.assertEqual(code, 0)
         self.assertEqual(report['status'], 'VERIFIED PASS')
+        self.assertTrue(report['dirty'])
         self.assertEqual(report['application_packages'], ['fixture/root', 'fixture/application'])
         self.assertEqual(set(report['scans']), {'module', 'package', 'symbol'})
         self.assertEqual(report['excluded_packages'], [])
+
+    def test_scan_output_does_not_make_a_clean_source_tree_dirty(self):
+        code, report = self.run_case('clean-worktree')
+        self.assertEqual(code, 0)
+        self.assertFalse(report['dirty'])
 
     def test_module_advisory_is_not_reachable_symbol_evidence(self):
         code, report = self.run_case('advisory')

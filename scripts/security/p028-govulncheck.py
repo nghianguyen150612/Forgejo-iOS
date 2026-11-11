@@ -33,6 +33,11 @@ def main():
     parser.add_argument('--timeout', type=int, default=1800)
     args = parser.parse_args()
     args.output = args.output.resolve()
+    # Capture the source state before writing scan evidence. In CI, the output
+    # directory is often inside the checkout and would otherwise make the
+    # evidence files themselves set `dirty` to true.
+    source_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    dirty = bool(subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip())
     args.output.mkdir(parents=True, exist_ok=True)
     # Native toolchain builds unpack the Go distribution below build/ios.
     # Scan exactly the committed application, never those compiler test trees
@@ -50,8 +55,8 @@ def main():
     env.setdefault('GOFLAGS', '-p=2')
     report = {
         'timestamp_utc': datetime.now(timezone.utc).isoformat(),
-        'source_sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
-        'dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip()),
+        'source_sha': source_sha,
+        'dirty': dirty,
         'tags': args.tags, 'patterns': ['./...'], 'excluded_packages': [],
         'source_selection': 'git archive HEAD; all tracked application packages, no generated compiler test tree',
         'tool_version': subprocess.check_output([args.tool, '-version'], text=True, env=env).strip(),
