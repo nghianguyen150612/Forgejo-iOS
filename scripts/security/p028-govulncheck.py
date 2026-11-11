@@ -83,7 +83,9 @@ def main():
                         advisory = report['advisories'].setdefault(finding['osv'], {'levels': [], 'findings': []})
                         if level not in advisory['levels']:
                             advisory['levels'].append(level)
-                        advisory['findings'].append({'scan': level, **finding})
+                        trace = finding.get('trace', [])
+                        evidence_level = 'reachable-symbol' if any(f.get('function') for f in trace) else ('imported-package' if any(f.get('package') for f in trace) else 'required-module')
+                        advisory['findings'].append({'scan': level, 'evidence_level': evidence_level, **finding})
             except (ValueError, KeyError) as error:
                 scan['parse_error'] = str(error)
             if timing.exists():
