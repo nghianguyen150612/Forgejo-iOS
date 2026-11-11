@@ -57,7 +57,11 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Fetch only this immutable source: macOS cannot store both iOS and ios/* refs.
+          # Native version identity is supplied explicitly by FORGEJO_VERSION below.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Install Go 1.26.7 toolchain
         uses: actions/setup-go@v5
