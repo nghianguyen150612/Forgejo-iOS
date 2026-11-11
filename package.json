@@ -127,5 +127,8 @@
   ],
   "scarfSettings": {
     "enabled": false
+  },
+  "overrides": {
+    "katex": "$katex"
   }
 }
