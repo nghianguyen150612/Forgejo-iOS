@@ -2,7 +2,7 @@
 set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$script_dir/../../.." && pwd)"
-build_root="${1:-$repo_root/build/ios/go1.26.7-a7}"
+build_root="${1:-$repo_root/build/ios/go1.26.11-a7}"
 if [[ "$build_root" != /* ]]; then
 	build_root="$repo_root/$build_root"
 fi
@@ -13,13 +13,13 @@ case "$build_root" in
 		exit 2
 		;;
 esac
-source_version='go1.26.7'
-source_url='https://go.dev/dl/go1.26.7.src.tar.gz'
-source_archive_sha256='0ed24eac755105085b89fe9cabc2742b91a0ad7b94b59d3ad364918ebc8956ad'
+source_version='go1.26.11'
+source_url='https://go.dev/dl/go1.26.11.src.tar.gz'
+source_archive_sha256='d44101b0ff27ed2a4c75ad46c17b9c74359209e2eb2ca7c9df6cb4fdb68e1969'
 asm_arm64_sha256='c2d54a06306c90a1d6ab666101c563056578a84c9b11f50575874af9c54b2133'
 stubs_sha256='0572c8b87cdbd975e8fddc5e8e84240d6397445589641035f0ce95e6676ee90e'
-version_sha256='89f723ad27054a2ccc7c22f2a974886f3077f64623a231297fcea2e74a73a782'
-patch_path="$script_dir/go1.26.7-a7-procyield.patch"
+version_sha256='489cd0f7bd5ac954d65ee65cb20f23ddf906a4677b76ed4e9f5f204e35e0d7ba'
+patch_path="$script_dir/go1.26.11-a7-procyield.patch"
 download_dir="$build_root/download"
 archive_path="$download_dir/${source_version}.src.tar.gz"
 goroot_path="$build_root/goroot"
@@ -107,7 +107,7 @@ toolchain_version="$("$toolchain_go" version)"
 [[ "$toolchain_version" == *"$source_version"* ]] || fail "built toolchain reports unexpected version: $toolchain_version"
 mkdir -p "$build_root"
 {
-	printf 'P7_RUNTIME=go1.26.7-a7\n'
+	printf 'P7_RUNTIME=go1.26.11-a7\n'
 	printf 'SOURCE_VERSION=%s\n' "$source_version"
 	printf 'SOURCE_URL=%s\n' "$source_url"
 	printf 'SOURCE_ARCHIVE_SHA256=%s\n' "$source_archive_sha256"

@@ -579,7 +579,7 @@ service_status() {
         [ -n "$uptime" ] || uptime=unknown
     fi
     version_number=$(field "$state" VERSION 2>/dev/null || :)
-    case "$version_number" in 15.0.9) version_text="Forgejo $version_number"; runtime_text=go1.26.7-a7;; *) version_text=unknown; runtime_text=unknown;; esac
+    case "$version_number" in 15.0.9) version_text="Forgejo $version_number"; runtime_text=go1.26.11-a7;; *) version_text=unknown; runtime_text=unknown;; esac
     http_code=unavailable
     if [ "$process_state" = running ]; then
         http_code=$(http_status)
@@ -638,7 +638,7 @@ service_run() {
     mv -f "$service_run_pid_tmp" "$pidfile" || { rm -f "$service_run_pid_tmp"; die 'Cannot install Forgejo PID state.'; }
     trap 'rm -f "$pidfile"' 0 INT TERM HUP
     service_log_event startup "$$"
-    printf '%s event=startup pid=%s runtime=go1.26.7-a7 forgejo=15.0.9\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$$" >>"$root/logs/launcher.log"
+    printf '%s event=startup pid=%s runtime=go1.26.11-a7 forgejo=15.0.9\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$$" >>"$root/logs/launcher.log"
     exec env -i PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin USER="$run_user" LOGNAME="$run_user" HOME="$root/data" GOMAXPROCS=1 \
         "$bin" web --config "$config" --work-path "$root"
 }
@@ -1062,7 +1062,7 @@ FAKE_LAUNCHCTL
     grep -F ' loaded' "$test_root/service-status.out" >/dev/null
     grep -F ' running' "$test_root/service-status.out" >/dev/null
     grep -F 'Forgejo 15.0.9' "$test_root/service-status.out" >/dev/null
-    grep -F 'go1.26.7-a7' "$test_root/service-status.out" >/dev/null
+    grep -F 'go1.26.11-a7' "$test_root/service-status.out" >/dev/null
     grep -F '200 OK' "$test_root/service-status.out" >/dev/null
     /bin/sh "$test_engine" --fixture-step service-stop "$test_root"
     [ ! -f "$test_root/LaunchDaemons/com.forgejo.ios.plist" ] && die 'service stop removed the plist.'

@@ -15,6 +15,7 @@ on:
   pull_request:
     branches:
       - iOS
+      - ios/p027-security-port
     paths:
       - '.github/workflows/ios-cgo-probe.yml'
       - 'PORTING_IOS.md'
@@ -42,10 +43,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Install Go 1.26.7 toolchain
+      - name: Install Go 1.26.11 toolchain
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.7'
+          go-version: '1.26.11'
           cache: false
 
       - name: Record Apple toolchain and initialize matrix
@@ -155,13 +156,13 @@ jobs:
             printf 'Go 1.20.14 multi-P probe build failed with exit %s; continuing for diagnostic artifact\n' "$status"
           fi
 
-      - name: Restore Go 1.26.7 toolchain
+      - name: Restore Go 1.26.11 toolchain
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.7'
+          go-version: '1.26.11'
           cache: false
 
-      - name: Build Go 1.26.7 probes and preserve Prompt 002 path
+      - name: Build Go 1.26.11 probes and preserve Prompt 002 path
         shell: bash
         run: |
           set -euo pipefail

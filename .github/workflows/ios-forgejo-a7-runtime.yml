@@ -24,6 +24,7 @@ on:
   pull_request:
     branches:
       - iOS
+      - ios/p027-security-port
     paths:
       - '.github/workflows/ios-forgejo-a7-runtime.yml'
       - 'Makefile'
@@ -69,25 +70,25 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Install bootstrap Go 1.27.1
+      - name: Install bootstrap Go 1.27.3
         uses: actions/setup-go@v5
         with:
-          go-version: '1.27.1'
+          go-version: '1.27.3'
           cache: false
 
-      - name: Build and verify isolated Go 1.26.7 A7 toolchain
+      - name: Build and verify isolated Go 1.26.11 A7 toolchain
         shell: bash
         run: |
           set -euo pipefail
           chmod +x scripts/ios/go-runtime/build-go-a7.sh
           mkdir -p build/ios
-          scripts/ios/go-runtime/build-go-a7.sh build/ios/go1.26.7-a7 2>&1 | tee build/ios/go1.26.7-a7-build.log
-          a7_goroot="$(awk -F= '$1 == "GOROOT" { print substr($0, index($0, "=") + 1) }' build/ios/go1.26.7-a7/provenance.env)"
+          scripts/ios/go-runtime/build-go-a7.sh build/ios/go1.26.11-a7 2>&1 | tee build/ios/go1.26.11-a7-build.log
+          a7_goroot="$(awk -F= '$1 == "GOROOT" { print substr($0, index($0, "=") + 1) }' build/ios/go1.26.11-a7/provenance.env)"
           [[ -n "$a7_goroot" && -x "$a7_goroot/bin/go" ]]
           printf 'GOROOT=%s\n' "$a7_goroot" >>"$GITHUB_ENV"
           printf '%s/bin\n' "$a7_goroot" >>"$GITHUB_PATH"
-          "$a7_goroot/bin/go" version | tee build/ios/go1.26.7-a7-go-version.txt
-          grep -F 'go1.26.7' build/ios/go1.26.7-a7-go-version.txt
+          "$a7_goroot/bin/go" version | tee build/ios/go1.26.11-a7-go-version.txt
+          grep -F 'go1.26.11' build/ios/go1.26.11-a7-go-version.txt
 
       - name: Build patched scheduler probe and inspect runtime path
         shell: bash
@@ -135,7 +136,7 @@ jobs:
             GOMAXPROCS=2 \
             scripts/ios/run-forgejo.sh status build/ios/forgejo-ios-a7-pristine \
             | tee build/ios/forgejo-ios-status.txt
-          grep -F 'Runtime: go1.26.7-a7' build/ios/forgejo-ios-status.txt
+          grep -F 'Runtime: go1.26.11-a7' build/ios/forgejo-ios-status.txt
           grep -F 'SQLite: enabled' build/ios/forgejo-ios-status.txt
           grep -F 'Policy: preserve-explicit' build/ios/forgejo-ios-status.txt
           if grep -Eiq '(^|=)(/Users/|/home/|.*token|.*password|.*secret)' build/ios/forgejo-ios-build-info.txt; then
@@ -153,7 +154,7 @@ jobs:
           export FORGEJO_IOS_SERVICE_DIR="$lifecycle_root"
           export FORGEJO_IOS_DEVICE_MODEL=ci-a7-ios12
           export FORGEJO_IOS_DARWIN_RELEASE=18.5
-          export FORGEJO_IOS_RUNTIME_VERSION=go1.26.7-a7
+          export FORGEJO_IOS_RUNTIME_VERSION=go1.26.11-a7
           export FORGEJO_IOS_VERSION="$FORGEJO_VERSION"
           chmod +x scripts/ios/run-forgejo.sh
           scripts/ios/run-forgejo.sh start /bin/sleep 60
@@ -211,7 +212,7 @@ jobs:
           chmod 600 "$runtime/custom/conf/app.ini"
           export FORGEJO_IOS_VERSION="$FORGEJO_VERSION"
           export FORGEJO_IOS_GIT_COMMIT="$GITHUB_SHA"
-          export FORGEJO_IOS_RUNTIME_VERSION=go1.26.7-a7
+          export FORGEJO_IOS_RUNTIME_VERSION=go1.26.11-a7
           sleep 30 &
           service_pid=$!
           printf '%s\n' "$service_pid" >"$runtime/forgejo.pid"
@@ -269,7 +270,7 @@ jobs:
             printf 'Git describe='; git describe --exclude '*-test' --tags --always
             printf 'Bootstrap Go='; go version 2>&1 || true
             printf '%s\n' '--- A7 toolchain provenance ---'
-            cat build/ios/go1.26.7-a7/provenance.env 2>/dev/null || true
+            cat build/ios/go1.26.11-a7/provenance.env 2>/dev/null || true
             printf '%s\n' '--- patched runtime procyield ---'
             cat build/ios/go126-a7-procyield-objdump.txt 2>/dev/null || true
             printf '%s\n' '--- Forgejo runtime procyield ---'
@@ -320,10 +321,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Install stock Go 1.26.7
+      - name: Install stock Go 1.26.11
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.7'
+          go-version: '1.26.11'
           cache: false
 
       - name: Run Linux Forgejo regression with stock Go
