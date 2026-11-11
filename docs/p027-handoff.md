@@ -185,3 +185,34 @@ dependency upgrades and the official ar mirror with full symbol scans; qualify
 A7 toolchain updates; then remaining v15 fixes and development-line mapping.
 Final qualification remains BLOCKED; the Draft PR is reviewable implementation,
 not a completed upstream port or a release candidate.
+
+
+## P027 upstream refresh and security batch — 2026-11-10
+
+Fresh remote state: official Codeberg advertises `forgejo` (no `main`) at `3f67b3a685eb8fe358b5159aaa32b5213b122738` (`2026-11-10T21:14:56+01:00`). Fork tracking `main` is `92d5abd016b692a9ce2b419d4f883934b44d03d8`, seven commits behind the official default. The supported v15 maintenance head is `3e36a8f11a05122570e325412d76f3582ed17549` (`2026-11-10T04:13:18+01:00`), unchanged from the prior stable-line snapshot. Production iOS baseline remains `dfb0b0664f1245f7436a306baf711540f712a03f`; P027 remains a draft PR against `iOS`.
+
+P027 now ports the v15 `blakesmith/ar` to `code.forgejo.org/crystal/ar` change (`3e36a8f11`, upstream main source `c7a1d39f`) while retaining `toolchain go1.26.7`, CGO/A7 runtime scripts, and packaging architecture. It also ports upstream private repository visibility checks for watched and starred repositories (`16811fea1`, `3f3e8bea8`), the acting-user permission correction (`dae5735ae`), and the regression fixes/tests (`93499a9a`, `45b8da39`, `e0bfad0d`). On the current default branch it ports the `fj` built-in OAuth application (`008a2846`) and removes the deprecated HTTP update-check endpoint (`64a8d3c2`); update checks use the existing Forgejo DNS endpoint. Exact dispositions and SHAs are in `p027-v15-ledger.csv` and `p027-development-inventory.csv`.
+
+The current default-branch mirror-ref fix (`efa001035`) is `BLOCKED`: it depends on force-push ref history that does not exist in the v15 iOS baseline. Porting only the namespace/configuration patch would strand existing refs. The remaining new default-branch changes are CI-only or metadata and are classified upstream-only. The refreshed development inventory has 1,382 ancestry entries. The divergent development line is still not represented as a completed semantic port; the inventory remains a triage artifact, not proof of absence.
+
+New implementation commits on `ios/p027-security-port`: `a7882540`, `9f7a2e12`, `d070c523`, `3b790c02`, `59c09684`, `5019970c`, `b2af3cf7`, `f3df7348`, `a434f9cf`, `08bd6c05`, `f04eb1cb`, and `3a826018`. The host CI workflow now includes auth, update-checker, user deletion, star/watch API and existing security regressions (`628e10da`). Existing P027 security, test, A7, and installer changes remain in the same separate Draft PR. Device qualification is **DEFERRED — OWNER APPROVED**; no production services or databases were accessed.
+
+
+### Current P027 host validation — 2026-11-11
+
+The security dependency batch is upstream v15 commit `44426ef4042a3b709795694b21db3bf1f034d116`, ported as `08bd6c05`. It updates `x/crypto` to v0.58.0, `x/net` to v0.62.0, `x/sync` to v0.24.0, `x/sys` to v0.49.0, `x/term` to v0.47.0, `x/text` to v0.43.0 and `x/tools` to v0.51.0; `go mod tidy` raised transitive `x/mod` to v0.41.0 in follow-up commit `f04eb1cb`. The module toolchain directive, custom A7 compiler source/patch, and native Go 1.26.7 pins remain unchanged.
+
+| Result | Command / scope | Outcome |
+| --- | --- | --- |
+| PASS | `go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./modules/updatechecker ./services/auth ./services/authz` | Exit 0 under Go 1.26.7 after the dependency update. |
+| PASS | `go test -p 2 -tags='sqlite sqlite_unlock_notify' ./services/user` | Exit 0; repo-specific access-token deletion regression included. |
+| PASS | `go test -p 2 -tags='sqlite sqlite_unlock_notify' ./modules/packages/debian` | Exit 0 with the cfo `ar` mirror and refreshed module set. |
+| PASS | `go vet -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./modules/updatechecker ./services/auth ./services/authz ./services/user` | Exit 0 after the security dependency and token deletion changes. |
+| PASS | `go mod verify` and `go mod tidy -diff` | All modules verified; tidy diff empty after recording `x/mod` v0.41.0. |
+| PASS | `make backend TAGS='sqlite sqlite_unlock_notify'` | Exit 0 using Go 1.26.7; built host binary reports `go1.26.7`, SQLite tags, and local P027 version `1.0.0-ios-44-3a826018b+gitea-1.22.0`. |
+| PASS | `make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(APIModifyLabels|PackageNuGet|ActionsForkPullRequest|APIStar|APIWatch)'"` | Exit 0 on Go 1.26.7 at pre-dependency source `a434f9cf`; 32 Actions trust cases, NuGet token scope, labels, private star/watch visibility all passed using synthetic SQLite data. The final pushed head CI reruns this selection after the dependency updates. |
+| PASS | `git diff --check` | Exit 0 before the documentation commit. |
+
+An initial test invocation after selecting the newer security modules reported that `go.mod` needed tidying. `go mod tidy -diff` showed only the required indirect `x/mod` v0.41.0 update; that update is committed, after which the listed tests passed. No dependency was downgraded. The full symbol-level vulnerability scan remains unresolved: prior P027 scan was killed with exit 137, and the current dependency batch has not been rescanned. The prior module scan's 20 advisory list remains historical evidence, not reachability proof. Native hosted/A7 CI for the final head is pending; local iOS cross-build requires unavailable Xcode tooling. Migration suites were not needed for this no-schema-change batch. Device qualification: **DEFERRED — OWNER APPROVED**.
+
+The v15 ledger now marks the token cleanup (#14622), October security batches (#14814/#15029), and x/net security batch (#15063) as ported. New commits also include `3a826018` for repo-specific token deletion. The next batch should address the remaining v15 security/dependency entries (including compress/brotli/minimatch) with reachability scans and exact A7 toolchain checks; the force-push mirror change remains blocked on its missing v15 reference-history prerequisite.
