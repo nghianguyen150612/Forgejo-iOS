@@ -399,3 +399,70 @@ compatibility (`85b0721`, `0d5d66fb`). Keep PR #11 Draft and based on
 Device qualification: **DEFERRED — OWNER APPROVED**. No device, owner database,
 installation, reboot, PF, LaunchDaemon, production mutation, release, merge or
 deployment action occurred. Production `iOS` remains unchanged.
+
+
+## Recovery checkpoint — 2026-11-11, x/crypto security fix
+
+Repository: `/workspace/work/Forgejo-iOS`. Implementation source
+`561abf5c16723b51d560dac2f097d192ec260558` is pushed on
+`ios/p028-security-compatibility`, based on P027
+`0452d8113a7bc50886ad020bfccadb764de45494`. PR #11 remains Draft and targets
+`ios/p027-security-port`. Production `iOS` remains
+`dfb0b0664f1245f7436a306baf711540f712a03f`. Official Codeberg refs remain
+`forgejo` `71ad73984701aa1a7f4e6748f12a9cf0fa0da6fa` and
+`v15.0/forgejo` `11c63cb45e74dd99d455550910e3b71a29d28fb2`.
+
+Source commit `561abf5c` upgrades `golang.org/x/crypto` from v0.58.0 to
+`v0.58.1-0.20261009181718-2f1f834330b2`, upstream source commit
+`2f1f834330b2d36ab3db8bfb33aaa1ac16794588`, addressing GO-2026-5932. Other
+P027 x/* selections remain unchanged. Earlier P028 dependency updates for
+compress, brotli, minimatch, sharp, KaTeX and happy-dom remain in place.
+
+Local validation for the exact source tree (Go 1.26.11, tags
+`sqlite sqlite_unlock_notify`):
+
+- In an isolated tracked-source archive with the updated go.mod/go.sum,
+  `go mod verify`: PASS; `go mod tidy -diff`: PASS.
+- Crypto-importing package tests: PASS for
+  `./models/asymkey ./models/auth ./modules/auth/password/hash ./modules/keying
+  ./modules/packages ./modules/setting ./modules/ssh ./modules/util
+  ./routers/api/v1/misc ./services/auth/method`.
+- Full-repository `go vet -p 2 -tags='sqlite sqlite_unlock_notify' ./...`:
+  PASS in the isolated tracked-source archive.
+- `govulncheck v1.9.0 -scan=module`: exit 0, 217 modules, x/crypto at the
+  fixed version, zero findings. This root module scan is not substituted for
+  the full application symbol scan.
+- A local full scan directly in the working tree exited 1 before coverage
+  because ignored Go 1.26.11 GOROOT test fixtures under
+  `build/ios/go1.26.11-a7/goroot/test` are invalid as one Go package. A
+  tracked-source archive scan was started, but the selected execution
+  environment became unavailable before its exit/result could be collected;
+  it is BLOCKED with no finding conclusion. The exact-source hosted scan below
+  remains the authoritative full-coverage result.
+- Current npm audit: exit 1, 13 moderate, zero high/critical; all findings are
+  development tooling. `npm audit --omit=dev --json`: exit 0, zero production
+  advisories. Suggested automatic fixes include downgrades and were not applied.
+
+Exact-source hosted qualification for `561abf5c16723b51d560dac2f097d192ec260558`:
+
+- Runtime compatibility matrix run 42998287857: PASS. Artifact 13845012380,
+  SHA-256 `1b3b0a879c5a2b84ee74dabbb080149d954622c0ba617cb9575b8fc67b8e9bd9`.
+- Runtime/A7 run 42998287874: stock Go 1.26.11 Linux regression and patched
+  A7 runtime jobs PASS (130447765333, 130447765810), including toolchain,
+  scheduler, production payload, launcher, backup/restore and security-surface
+  validation. Artifact 13844404245, 75,696,298 bytes, SHA-256
+  `ab000333281afa5c9713883441b2ea69d48eac0242aec2402224c58cb97b7667`.
+- Production build run 42998288059 was IN PROGRESS; host security run
+  42998288099 was QUEUED at this checkpoint. Their results must be recorded
+  against this exact source, not inferred from previous commits.
+
+P028 remains in progress. The full exact-source vulnerability scan and the
+production build are outstanding. The npm development-tooling findings remain
+unresolved; no version was downgraded and no audit threshold was weakened.
+Remaining v15 ledger rows include scheduled-workflow parsing, Arch package
+names/epochs, unnecessary tag data and FilesInit LatestSha. Mirror-reference
+change `efa00103570af0d7ad5eea92be9a02fa209459b2` remains BLOCKED on missing
+force-push history prerequisites. Next action: complete exact-source host
+security and production CI, then continue the highest-priority compatible v15
+port. Device qualification remains **DEFERRED — OWNER APPROVED**. Production
+changes: none.
