@@ -236,7 +236,9 @@ deployment action occurred. Production `iOS` remains unchanged.
 Repository: `/workspace/work/Forgejo-iOS`. Branch
 `ios/p028-security-compatibility`. Latest pushed implementation commit:
 `8d4c3eae9a246640c9f13045345e202f3294944b`; origin matched this source SHA
-before the pending docs-only evidence commit. P028 base is P027
+when its exact-source workflows ran. The handoff and evidence were committed
+in docs-only commit `36e7d1257ec2b02f93a1424c2195e523fe3184df`, which adds no
+application changes. P028 base is P027
 `0452d8113a7bc50886ad020bfccadb764de45494`. Draft PR #11 is open and targets
 `ios/p027-security-port`. Production `iOS` remains
 `dfb0b0664f1245f7436a306baf711540f712a03f`.
@@ -386,9 +388,11 @@ Exact-source hosted validation for `8d4c3eae9a246640c9f13045345e202f3294944b`:
 
 All four latest-source hosted workflows have final outcomes. The full scanner
 and audit gates remain blockers; successful native builds do not waive them.
-At this checkpoint implementation source is pushed and the worktree contains
-preserved documentation/evidence changes awaiting commit. Next exact action is
-to port and test scheduled-workflow parsing (`ab972d7b`) or Arch package/epoch
+At this checkpoint implementation source is pushed; the current handoff,
+ledgers and reports are preserved in the docs-only evidence commit above.
+Exact-source application CI is for source `8d4c3eae`, and later docs-only
+commits do not change that tested application tree. Next exact action is to
+port and test scheduled-workflow parsing (`ab972d7b`) or Arch package/epoch
 compatibility (`85b0721`, `0d5d66fb`). Keep PR #11 Draft and based on
 `ios/p027-security-port`.
 
