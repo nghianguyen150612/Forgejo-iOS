@@ -466,3 +466,38 @@ force-push history prerequisites. Next action: complete exact-source host
 security and production CI, then continue the highest-priority compatible v15
 port. Device qualification remains **DEFERRED — OWNER APPROVED**. Production
 changes: none.
+
+
+## Exact-source CI completion update — source 561abf5c
+
+The previously pending workflows for implementation source
+`561abf5c16723b51d560dac2f097d192ec260558` have completed:
+
+- Runtime compatibility matrix 42998287857: PASS; artifact 13845012380,
+  SHA-256 `1b3b0a879c5a2b84ee74dabbb080149d954622c0ba617cb9575b8fc67b8e9bd9`.
+- Stock Linux and patched A7 runtime jobs in 42998287874: PASS. The run
+  confirms the Go 1.26.11 A7 toolchain, scheduler path, production payload,
+  launcher, backup/restore and security-surface checks. Artifact 13844404245,
+  SHA-256 `ab000333281afa5c9713883441b2ea69d48eac0242aec2402224c58cb97b7667`.
+- Production build 42998288059: PASS; artifact 13845439796, SHA-256
+  `e3168b484b35aad9e4fa8664e97a8fc1838c916f0a8de09ae284bb0598a2da9b`.
+- Host security run 42998288099: vulnerability job 130447765594 PASS; full
+  module/package/symbol scan reports `VERIFIED PASS`, with all listed packages
+  and no exclusions. Unit/SQLite fixtures, backend build and API/workflow trust
+  integration job 130447765623 PASS. Vulnerability evidence artifact 13845364708,
+  SHA-256 `c7206159550ab1c89bda87ca50b696596ecd594774949a62b76fa87c4d00bb7a`.
+- Frontend Vitest and webpack build PASS. The strict npm audit step in frontend
+  job 130447765042 exits 1 with 13 moderate development-tool advisories, zero
+  high and zero critical. Production-only npm audit exits 0. Audit artifact
+  13845798674, SHA-256
+  `ea55edf6135a9ca7f4e0da32737e4221e8f30436ee4f9904e3fdab6ff21a6a52`.
+  No security threshold was weakened and no downgrade was applied.
+
+Thus GO-2026-5932 is absent from the complete exact-source vulnerability scan
+with the fixed x/crypto version. The frontend development-tool advisories remain
+the only failing exact-source security gate. PR #11 remains Draft and targets
+`ios/p027-security-port`; production remains unchanged. The current P028 head
+at this checkpoint includes a handoff-only documentation commit after source
+`561abf5c`; the GitHub comparison confirms it changes only
+`docs/p028-handoff.md`. Device qualification remains
+**DEFERRED — OWNER APPROVED**.
