@@ -103,7 +103,7 @@ printf '%s\n' 'building isolated Go toolchain; bootstrap variables are host-loca
 )
 toolchain_go="$goroot_path/bin/go"
 [[ -x "$toolchain_go" ]] || fail "toolchain build did not produce $toolchain_go"
-toolchain_version="$("$toolchain_go" version)"
+toolchain_version="$(GOTOOLCHAIN=local "$toolchain_go" version)"
 [[ "$toolchain_version" == *"$source_version"* ]] || fail "built toolchain reports unexpected version: $toolchain_version"
 mkdir -p "$build_root"
 {
