@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -76,11 +77,15 @@ def main():
             if level != 'module':
                 command += ['-tags=' + args.tags, './...']
             timing = args.output / (level + '.time')
-            command = ['/usr/bin/time', '-v', '-o', str(timing), 'timeout', '--signal=TERM', '--kill-after=30', str(args.timeout)] + command
+            command = ['timeout', '--signal=TERM', '--kill-after=30', str(args.timeout)] + command
             start = time.monotonic()
             output = args.output / (level + '.json')
             with output.open('w') as stdout, (args.output / (level + '.stderr')).open('w') as stderr:
-                result = subprocess.run(command, cwd=source_root, env=env, stdout=stdout, stderr=stderr)
+                process = subprocess.Popen(command, cwd=source_root, env=env, stdout=stdout, stderr=stderr)
+                _, status, usage = os.wait4(process.pid, 0)
+                process.returncode = os.waitstatus_to_exitcode(status)
+            result = process
+            timing.write_text(json.dumps({'max_rss_kib': usage.ru_maxrss / (1024 if sys.platform == 'darwin' else 1), 'user_seconds': usage.ru_utime, 'system_seconds': usage.ru_stime, 'major_page_faults': usage.ru_majflt, 'wait_status': status, 'termination_signal': os.WTERMSIG(status) if os.WIFSIGNALED(status) else None}) + '\n')
             scan = {'command': command, 'exit_code': result.returncode, 'seconds': round(time.monotonic() - start, 3), 'complete': False}
             try:
                 messages = list(json_stream(output))
