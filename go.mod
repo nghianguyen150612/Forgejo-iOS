@@ -99,7 +99,7 @@ require (
 	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc
 	gitlab.com/gitlab-org/api/client-go v0.143.2
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/crypto v0.58.0
+	golang.org/x/crypto v0.58.1-0.20261009181718-2f1f834330b2
 	golang.org/x/image v0.45.0
 	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.36.0
