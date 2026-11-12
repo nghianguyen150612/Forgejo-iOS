@@ -1,0 +1,6 @@
+upstream_sha,classification,disposition
+f2a37353aa84f67e08cba69e4de468bb9fe2d533,PORT REQUIRED,Applied bed7432aba; verify actual inserted units and default unit creation before qualification.
+7f7e02bd2d2ba7c7d121edc06d1e321450f7cad0,NOT APPLICABLE,Upstream CI security job skip; retain existing full security gates.
+efa00103570af0d7ad5eea92be9a02fa209459b2,BLOCKED,Depends on 6c2b8b9d726a44abbaf7bc07d293cb10e93829a7 force-push reference creation and retention. No compatibility or migration qualification.
+6c2b8b9d726a44abbaf7bc07d293cb10e93829a7,BLOCKED,Creates old/new refs keyed by force-push comment ID and changes cleanup and receive behavior. v15 adaptation and existing reference migration remain unqualified.
+14d5d663e9e0a62c5e6dec83bf3509be3c18bdaf,IOS ADAPTATION REQUIRED,Development timeline behavior requires compatibility review.
