@@ -169,7 +169,8 @@ metadata_value() {
 			"$binary_dir/forgejo-ios-build-info.txt" \
 			"$binary_dir/forgejo-ios-a7-build-info.txt" \
 			"${binary_path}-build-info.txt" \
-			"build/ios/go1.26.7-a7/provenance.env"; do
+			"build/ios/go1.26.11-a7/provenance.env" \
+		"build/ios/go1.26.7-a7/provenance.env"; do
 			if [[ -r "$candidate" ]]; then
 				build_info="$candidate"
 				break

@@ -671,6 +671,26 @@ func TestRenamedFileHistory(t *testing.T) {
 	})
 }
 
+func TestFilesInitPopulatesLatestSha(t *testing.T) {
+	onApplicationRun(t, func(t *testing.T, _ *url.URL) {
+		user := forgery.CreateUser(t, nil)
+		var latestSha string
+		repo := forgery.CreateRepository(t, user, &forgery.CreateRepositoryOptions{
+			Files:     forgery.FilesInit{},
+			LatestSha: &latestSha,
+		})
+
+		require.NotEmpty(t, latestSha)
+		gitRepo, err := git.OpenRepository(git.DefaultContext, repo.RepoPath())
+		require.NoError(t, err)
+		defer gitRepo.Close()
+
+		branchSha, err := gitRepo.GetBranchCommitID(repo.DefaultBranch)
+		require.NoError(t, err)
+		assert.Equal(t, branchSha, latestSha)
+	})
+}
+
 func TestMarkDownReadmeImage(t *testing.T) {
 	defer tests.PrepareTestEnv(t)()
 

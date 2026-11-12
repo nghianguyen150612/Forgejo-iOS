@@ -1,0 +1,688 @@
+{
+  "audit_timestamp_utc": "2026-11-11T03:30:05.728355+00:00",
+  "baseline_source": "0452d8113a7bc50886ad020bfccadb764de45494",
+  "implementation_source": "2f58d3aa53fd9b150d1b02ef727030ca4cd56399",
+  "scanner": "govulncheck v1.9.0",
+  "before_go": "go1.26.7",
+  "after_go": "go1.26.11",
+  "scope": "module evidence; not imported-package or reachable-symbol proof",
+  "before": {
+    "GO-2026-6888": {
+      "summary": "Excessive memory allocation when decompressing crafted streams in github.com/andybalholm/brotli",
+      "aliases": [
+        "CVE-2026-111497",
+        "GHSA-c9gr-gmg4-2vqv"
+      ],
+      "references": [
+        {
+          "type": "ADVISORY",
+          "url": "https://github.com/andybalholm/brotli/security/advisories/GHSA-c9gr-gmg4-2vqv"
+        },
+        {
+          "type": "FIX",
+          "url": "https://github.com/andybalholm/brotli/commit/33c2a9884269798192b5ecf171288f98939dbe42"
+        },
+        {
+          "type": "WEB",
+          "url": "https://github.com/andybalholm/brotli/releases/tag/v1.2.7"
+        },
+        {
+          "type": "WEB",
+          "url": "https://github.com/google/brotli/commit/0ed4268a4401abcb4472096340477cf4af7d1a2b"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6888",
+          "fixed_version": "v1.2.7",
+          "trace": [
+            {
+              "module": "github.com/andybalholm/brotli",
+              "version": "v1.2.0"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6599": {
+      "summary": "Reset context tracking on consecutive template expressions in html/template",
+      "aliases": [
+        "CVE-2026-94448"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/839866"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81821"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6599",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6600": {
+      "summary": "Recognize yield as regexp preceder keyword in html/template",
+      "aliases": [
+        "CVE-2026-97030"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/840925"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81823"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6600",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6603": {
+      "summary": "HTTP/2 server memory exhaustion due to Trailer headers in net/http",
+      "aliases": [
+        "CVE-2026-78659"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847185"
+        },
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847314"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81857"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/ZPwCyRUuGBs"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6603",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        },
+        {
+          "osv": "GO-2026-6603",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6604": {
+      "summary": "Root.Mkdir(All) can follow junctions out of the root on Windows in os",
+      "aliases": [
+        "CVE-2026-56857"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847305"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81739"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6604",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6605": {
+      "summary": "HTTP/1 client connection desynchronization after CONNECT rejection in net/http",
+      "aliases": [
+        "CVE-2026-56866"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847306"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81740"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6605",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6607": {
+      "summary": "Reject malformed ECH outer extension references in crypto/tls",
+      "aliases": [
+        "CVE-2026-97031"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847312"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81855"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6607",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6608": {
+      "summary": "Memory limit bypass when parsing MIME headers in net/textproto, mime/multipart",
+      "aliases": [
+        "CVE-2026-94440"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847307"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81741"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6608",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6609": {
+      "summary": "Lack of limit on size of parsed Range headers in net/http",
+      "aliases": [
+        "CVE-2026-78667"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847309"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81858"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6609",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6610": {
+      "summary": "HTTP/2 transport accepts malformed framing-related headers in net/http",
+      "aliases": [
+        "CVE-2026-78660"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/835145"
+        },
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/836385"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81115"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6610",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        },
+        {
+          "osv": "GO-2026-6610",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6611": {
+      "summary": "Excessive CPU consumption from repeated initial window changes in net/http",
+      "aliases": [
+        "CVE-2026-78669"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847186"
+        },
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847308"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81742"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/ZPwCyRUuGBs"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6611",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        },
+        {
+          "osv": "GO-2026-6611",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6612": {
+      "summary": "Double flow control refund on HTTP/2 server streams in net/http",
+      "aliases": [
+        "CVE-2026-78663"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847187"
+        },
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847310"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81743"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/ZPwCyRUuGBs"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6612",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        },
+        {
+          "osv": "GO-2026-6612",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6613": {
+      "summary": "HTTP/1 server connection desynchronization after 2xx CONNECT response in net/http",
+      "aliases": [
+        "CVE-2026-94439"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847311"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81744"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6613",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6617": {
+      "summary": "HTTP/2 server crash due to HPACK encoder race in net/http",
+      "aliases": [
+        "CVE-2026-97032"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847188"
+        },
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/847313"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/81867"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/U2fTuyDJznI"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/ZPwCyRUuGBs"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6617",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        },
+        {
+          "osv": "GO-2026-6617",
+          "fixed_version": "v1.26.9",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6809": {
+      "summary": "Distrust compromised intermediate certificates in crypto/x509",
+      "aliases": [
+        "CVE-2026-111943"
+      ],
+      "references": [
+        {
+          "type": "FIX",
+          "url": "https://go.dev/cl/851047"
+        },
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/82345"
+        },
+        {
+          "type": "WEB",
+          "url": "https://groups.google.com/g/golang-announce/c/66pojueaQek"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6809",
+          "fixed_version": "v1.26.10",
+          "trace": [
+            {
+              "module": "stdlib",
+              "version": "v1.26.7"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-5932": {
+      "summary": "The golang.org/x/crypto/openpgp package is unmaintained, unsafe by design, and has known security issues",
+      "aliases": [],
+      "references": [
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/44226"
+        },
+        {
+          "type": "WEB",
+          "url": "https://go.dev/issue/81227"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-5932",
+          "fixed_version": "v0.58.1-0.20261009181718-2f1f834330b2",
+          "trace": [
+            {
+              "module": "golang.org/x/crypto",
+              "version": "v0.58.0"
+            }
+          ]
+        }
+      ]
+    },
+    "GO-2026-6865": {
+      "summary": "Panic on two-block frames in github.com/klauspost/compress",
+      "aliases": [
+        "CVE-2026-116591",
+        "GHSA-fpmh-frq8-7rj8"
+      ],
+      "references": [
+        {
+          "type": "ADVISORY",
+          "url": "https://github.com/klauspost/compress/security/advisories/GHSA-fpmh-frq8-7rj8"
+        },
+        {
+          "type": "FIX",
+          "url": "https://github.com/klauspost/compress/commit/7f5d8528720c895a6106f201719f87eb030a565d"
+        },
+        {
+          "type": "WEB",
+          "url": "https://github.com/klauspost/compress/releases/tag/v1.20.2"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-6865",
+          "fixed_version": "v1.20.2",
+          "trace": [
+            {
+              "module": "github.com/klauspost/compress",
+              "version": "v1.18.7"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "after": {
+    "GO-2026-5932": {
+      "summary": "The golang.org/x/crypto/openpgp package is unmaintained, unsafe by design, and has known security issues",
+      "aliases": [],
+      "references": [
+        {
+          "type": "REPORT",
+          "url": "https://go.dev/issue/44226"
+        },
+        {
+          "type": "WEB",
+          "url": "https://go.dev/issue/81227"
+        }
+      ],
+      "evidence": [
+        {
+          "osv": "GO-2026-5932",
+          "fixed_version": "v0.58.1-0.20261009181718-2f1f834330b2",
+          "trace": [
+            {
+              "module": "golang.org/x/crypto",
+              "version": "v0.58.0"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "module_advisories_no_longer_reported": [
+    "GO-2026-6599",
+    "GO-2026-6600",
+    "GO-2026-6603",
+    "GO-2026-6604",
+    "GO-2026-6605",
+    "GO-2026-6607",
+    "GO-2026-6608",
+    "GO-2026-6609",
+    "GO-2026-6610",
+    "GO-2026-6611",
+    "GO-2026-6612",
+    "GO-2026-6613",
+    "GO-2026-6617",
+    "GO-2026-6809",
+    "GO-2026-6865",
+    "GO-2026-6888"
+  ],
+  "remaining_full_scan": "PENDING; see p028-handoff.md"
+}

@@ -1,0 +1,138 @@
+go: finding module for package issue29612.dir/p2/ssa
+go: finding module for package issue20014.dir/a
+go: finding module for package issue29612.dir/p1/ssa
+go: finding module for package issue30862.dir/b
+go: finding module for package issue30862.dir/a
+go: finding module for package issue44732.dir/bar
+go: finding module for package issue44732.dir/foo
+go: finding module for package issue46653.dir/bad
+go: finding module for package issue47185.dir/bad
+go: finding module for package issue68526.dir/a
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/alias3.dir imports
+	./a: "./a" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/alias3.dir imports
+	./b: "./b" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/ddd2.dir imports
+	./ddd2: "./ddd2" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs imports
+	unicode//utf8: malformed import path "unicode//utf8": double slash
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug083.dir imports
+	./bug0: "./bug0" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug133.dir imports
+	./bug1: "./bug1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug160.dir imports
+	./x: "./x" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug222.dir imports
+	./chanbug: "./chanbug" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug282.dir imports
+	./p1: "./p1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug322.dir imports
+	./lib: "./lib" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug324.dir imports
+	./p: "./p" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug345.dir imports
+	./io: "./io" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug369.dir imports
+	./fast: "./fast" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug369.dir imports
+	./slow: "./slow" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug377.dir imports
+	./one: "./one" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug382.dir imports
+	./pkg: "./pkg" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug392.dir imports
+	./pkg2: "./pkg2" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug437.dir imports
+	./two: "./two" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug448.dir imports
+	./pkg1: "./pkg1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug467.dir imports
+	./p2: "./p2" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/bug504.dir imports
+	./c: "./c" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue10700.dir imports
+	./other: "./other" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue13777.dir imports
+	./burnin: "./burnin" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue15071.dir imports
+	./exp: "./exp" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue16133.dir imports
+	./a1: "./a1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue16133.dir imports
+	./a2: "./a2" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue19467.dir imports
+	./mysync: "./mysync" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue20014.dir imports
+	issue20014.dir/a: cannot find module providing package issue20014.dir/a: unrecognized import path "issue20014.dir/a": https fetch: Get "https://issue20014.dir/a?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue20682.dir imports
+	./q: "./q" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue27836.dir imports
+	./Þfoo: "./Þfoo" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue29612.dir imports
+	issue29612.dir/p1/ssa: cannot find module providing package issue29612.dir/p1/ssa: unrecognized import path "issue29612.dir/p1/ssa": https fetch: Get "https://issue29612.dir/p1/ssa?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue29612.dir imports
+	issue29612.dir/p2/ssa: cannot find module providing package issue29612.dir/p2/ssa: unrecognized import path "issue29612.dir/p2/ssa": https fetch: Get "https://issue29612.dir/p2/ssa?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue30862.dir imports
+	issue30862.dir/b: cannot find module providing package issue30862.dir/b: unrecognized import path "issue30862.dir/b": https fetch: Get "https://issue30862.dir/b?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue30862.dir/b imports
+	issue30862.dir/a: cannot find module providing package issue30862.dir/a: unrecognized import path "issue30862.dir/a": https fetch: Get "https://issue30862.dir/a?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue31053.dir imports
+	./f1: "./f1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue4326.dir imports
+	./q1: "./q1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue44732.dir imports
+	issue44732.dir/bar: cannot find module providing package issue44732.dir/bar: unrecognized import path "issue44732.dir/bar": https fetch: Get "https://issue44732.dir/bar?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue44732.dir imports
+	issue44732.dir/foo: cannot find module providing package issue44732.dir/foo: unrecognized import path "issue44732.dir/foo": https fetch: Get "https://issue44732.dir/foo?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue46653.dir imports
+	issue46653.dir/bad: cannot find module providing package issue46653.dir/bad: unrecognized import path "issue46653.dir/bad": https fetch: Get "https://issue46653.dir/bad?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue47185.dir imports
+	issue47185.dir/bad: cannot find module providing package issue47185.dir/bad: unrecognized import path "issue47185.dir/bad": https fetch: Get "https://issue47185.dir/bad?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue4932.dir imports
+	./foo: "./foo" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue4932.dir imports
+	./state: "./state" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue5125.dir imports
+	./bug: "./bug" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue5614.dir imports
+	./rethinkgo: "./rethinkgo" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue59709.dir imports
+	./aconfig: "./aconfig" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue59709.dir imports
+	./bresource: "./bresource" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue59709.dir imports
+	./cmem: "./cmem" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue59709.dir imports
+	./dcache: "./dcache" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue6295.dir imports
+	./p0: "./p0" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue68526.dir imports
+	issue68526.dir/a: cannot find module providing package issue68526.dir/a: unrecognized import path "issue68526.dir/a": https fetch: Get "https://issue68526.dir/a?go-get=1": Forbidden
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/fixedbugs/issue7995b.dir imports
+	./x1: "./x1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/import2.dir imports
+	./import2: "./import2" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/import4.dir imports
+	./empty: "./empty" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/interface/embed1.dir imports
+	./embed0: "./embed0" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/interface/private.dir imports
+	./private1: "./private1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/interface/recursive1.dir imports
+	./recursive1: "./recursive1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/linkname.dir imports
+	./linkname1: "./linkname1" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/linkname.dir imports
+	./linkname2: "./linkname2" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/method4.dir imports
+	./method4a: "./method4a" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/typeparam/issue50121b.dir imports
+	./d: "./d" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/typeparam/issue50486.dir imports
+	./goerror_fp: "./goerror_fp" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/typeparam/issue50561.dir imports
+	./diameter: "./diameter" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/typeparam/issue50598.dir imports
+	./a0: "./a0" is relative, but relative import paths are not supported in module mode
+go: forgejo.org/build/ios/go1.26.11-a7/goroot/test/typeparam/issue51836.dir imports
+	./aa: "./aa" is relative, but relative import paths are not supported in module mode

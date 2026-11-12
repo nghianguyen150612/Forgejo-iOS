@@ -1,8 +1,8 @@
 name: P027 host security regressions
 on:
   pull_request:
-    branches: [iOS]
-    paths: ['**/*.go', 'go.mod', 'go.sum', '.github/workflows/p027-host.yml']
+    branches: [iOS, ios/p027-security-port]
+    paths: ['**/*.go', 'go.mod', 'go.sum', '.github/workflows/p027-host.yml', 'scripts/security/**', 'package.json', 'package-lock.json', 'web_src/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,14 +16,65 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v5
         with:
           go-version-file: go.mod
           cache: false
       - name: Unit and SQLite fixture checks
-        run: go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./modules/updatechecker ./routers/api/packages/nuget ./services/auth ./services/authz ./services/user
+        run: go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./modules/updatechecker ./routers/api/packages/nuget ./services/auth ./services/authz ./services/user ./models/perm/access ./services/issue ./services/actions ./services/repository
       - name: Build backend required by integration subprocesses
         run: make backend TAGS='sqlite sqlite_unlock_notify'
       - name: API and workflow trust integration checks
-        run: make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(APIModifyLabels|PackageNuGet|ActionsForkPullRequest|APIStar|APIWatch)'"
+        run: make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(APIModifyLabels|PackageNuGet|ActionsForkPullRequest|APIStar|APIWatch|PullAutoMergeFromFork|GitPushConcurrentBranchUpdate|ActionsAPIWorkflowDispatch|APIOrgEdit|ActionsFinishLogs|ActionsDownloadTask)'"
+
+  vulnerabilities:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      GOMAXPROCS: '2'
+      GOMEMLIMIT: 3GiB
+      GOFLAGS: -p=2
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+      - name: Scanner failure and coverage regression fixtures
+        run: python3 -m unittest discover -s scripts/security -p 'test_*.py'
+      - name: Full module, package and symbol scans with coverage and resource evidence
+        run: python3 scripts/security/p028-govulncheck.py --output build/security/p028
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p028-vulnerability-evidence
+          path: build/security/p028
+          if-no-files-found: error
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - run: npx vitest run
+      - run: make frontend
+      - name: Record dependency advisories without changing the failure threshold
+        run: npm audit --json > npm-audit.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p028-frontend-audit
+          path: npm-audit.json
