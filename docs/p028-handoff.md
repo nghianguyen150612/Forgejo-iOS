@@ -520,6 +520,24 @@ The baseline graph and changes were checked package by package:
 
 ### Supported-v15 ports
 
+Baseline audit entries (13 total) and their dependency paths are itemized below. The saved pre-remediation report provides the vulnerable ranges and npm advisory metadata; current full and production-only audits return zero vulnerabilities.
+
+| Finding | Direct/transitive path in baseline lockfile | Remediation and compatibility |
+|---|---|---|
+| @typescript-eslint/eslint-plugin | Transitive: typescript-eslint 8.56.1 → @typescript-eslint/eslint-plugin 8.56.1 → type-utils / utils | Updated the typescript-eslint suite to 8.72.2, same major; current ESLint 9 and TypeScript 5.9 peers are supported. |
+| @typescript-eslint/parser | Transitive: typescript-eslint 8.56.1 → parser 8.56.1 → typescript-estree 8.56.1 | Updated the suite to 8.72.2. |
+| @typescript-eslint/type-utils | Transitive: typescript-eslint → eslint-plugin → type-utils; advisory path included typescript-estree and utils | Updated the suite to 8.72.2. |
+| @typescript-eslint/typescript-estree | Transitive through parser, type-utils and utils; nested minimatch 10.2.6 | Updated the suite to 8.72.2 and scoped minimatch to 11.0.8. |
+| @typescript-eslint/utils | Transitive: typescript-eslint → eslint-plugin / type-utils → utils; advisory path included typescript-estree | Updated the suite to 8.72.2. |
+| editorconfig | Transitive: @vue/test-utils 2.4.6 → js-beautify 1.15.4 → editorconfig 1.0.7 → nested minimatch 9.0.9 | @vue/test-utils 2.5.1 selects js-beautify 2.0.3; editorconfig 4.0.0 and minimatch 11.0.8 are fixed. editorconfig 4 requires Node 22; CI Node 24 qualifies this dev-only path. |
+| eslint-plugin-sonarjs | Direct 4.2.2 → nested minimatch 10.2.6 | Kept the direct tool; the scoped minimatch 11.0.8 override fixes its vulnerable transitive dependency. |
+| glob | Two transitive copies: js-beautify/node_modules/glob 10.5.0 and read-package-json/node_modules/glob 10.5.0 | Both copies use 14.0.5, above the advisory range through 14.0.1. |
+| js-beautify | Transitive: @vue/test-utils 2.4.6 → js-beautify 1.15.4; findings came through editorconfig and glob | @vue/test-utils 2.5.1 selects js-beautify 2.0.3, whose editorconfig and glob paths are explicitly fixed. |
+| markdownlint-cli | Direct 0.50.0 → nested minimatch 10.2.6 | Kept the direct tool; minimatch 11.0.8 fixes the nested path. |
+| minimatch | Six transitive copies: typescript-estree/minimatch 10.2.6; editorconfig/minimatch 9.0.9; sonarjs/minimatch 10.2.6; js-beautify/minimatch 9.0.9; markdownlint-cli/minimatch 10.2.6; read-package-json/minimatch 9.0.9 | All six development copies resolve to 11.0.8, above the vulnerable range below 11.0.1. Production minimatch 11.0.1 already exceeded that range and was retained. |
+| read-package-json | Transitive via license-checker-rseidelsohn → read-installed-packages → read-package-json 6.0.4 → glob 10.5.0 and minimatch 9.0.9 | Kept read-package-json; scoped overrides select glob 14.0.5 and minimatch 11.0.8. |
+| typescript-eslint | Direct 8.56.1 → @typescript-eslint components listed above | Updated to 8.72.2 without a major change. The saved baseline metadata suggested 8.36.0, which would be a downgrade; it was not used. The current strict audit confirms zero findings. |
+
 Five separate incremental code commits implement the requested upstream fixes:
 
 - 7060a2af662ff89c39c34a5ef5dd00c6df065a5d ← ab972d7b9392a79991da9aa45963e3f6a3ae1927: scheduled workflows remain enabled after transient failures; persistent parsing/configuration errors remain distinguishable.
