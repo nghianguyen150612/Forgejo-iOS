@@ -133,7 +133,10 @@
     "katex": "$katex",
     "js-beautify": {
       "glob": "^14.0.5",
-      "editorconfig": "^4.0.0"
+      "editorconfig": "^3.0.2"
+    },
+    "editorconfig@^3.0.2": {
+      "minimatch": "11.0.8"
     },
     "read-package-json": {
       "glob": "^14.0.5"
