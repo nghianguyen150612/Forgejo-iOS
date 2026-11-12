@@ -501,3 +501,45 @@ at this checkpoint includes a handoff-only documentation commit after source
 `561abf5c`; the GitHub comparison confirms it changes only
 `docs/p028-handoff.md`. Device qualification remains
 **DEFERRED — OWNER APPROVED**.
+
+
+## P028 resume checkpoint — 2026-11-12
+
+Recovery started at requested head aa556f91d00a315a09471afa01030e9db4075037 on ios/p028-security-compatibility. PR #11 is Open Draft and still targets P027 ios/p027-security-port at 0452d8113a7bc50886ad020bfccadb764de45494. The first new implementation commit is c04a35987afa60e923f2ade848f6d0f5b2a67ce5; the five compatible v15 ports follow it, ending at source commit 29ce164cce525a5f6e98b9b55e7f70776df207b4. No production branch was changed.
+
+### Frontend audit remediation
+
+The pre-remediation strict audit captured 13 moderate findings, zero high/critical findings, all in development tooling. The production-only audit had zero advisories. The saved baseline is docs/p028-npm-audit-after-lock-update.json; after remediation, docs/p028-npm-audit-after-remediation.json and the production report both contain zero vulnerabilities. Fresh npm audit --audit-level=moderate --json and npm audit --omit=dev --audit-level=moderate --json also both exit 0 on this tree.
+
+The baseline graph and changes were checked package by package:
+
+- Direct typescript-eslint 8.56.1 brought @typescript-eslint parser, plugin, type-utils, utils and typescript-estree at 8.56.1; the package advisory also surfaced the nested @typescript-eslint/typescript-estree/node_modules/minimatch 10.2.6. The tool suite moved to 8.72.2 without changing its major. Its declared peers accept ESLint 9 and TypeScript 5.9; the current Node 24 test and webpack build pass.
+- Direct eslint-plugin-sonarjs 4.2.2 had nested minimatch 10.2.6. Direct markdownlint-cli 0.50.0 had nested minimatch 10.2.6. Both now resolve to minimatch 11.0.8 through the scoped override. Other affected nested minimatch copies were under editorconfig 1.0.7, js-beautify 1.15.4 and read-package-json 6.0.4, at versions 9.0.9 or 10.2.6. The fixed advisory boundary is below 11.0.1; current development copies are 11.0.8. Existing production minimatch 11.0.1 is already outside that vulnerable range and remains unchanged.
+- js-beautify was transitive through @vue/test-utils 2.4.6 and brought vulnerable editorconfig 1.0.7 plus glob 10.5.0 copies under itself and read-package-json. Updating @vue/test-utils to 2.5.1 selected js-beautify 2.0.3; overrides now select editorconfig 4.0.0 and glob 14.0.5. The glob advisory affects versions through 14.0.1. read-package-json remains reachable through the development-only license-checker-rseidelsohn chain, with its glob fixed to 14.0.5.
+- typescript-eslint 8.72.2, minimatch 11.0.8, glob 14.0.5 and editorconfig 4.0.0 satisfy the current CI Node 24 toolchain; editorconfig 4.0.0 requires Node >=22. The repository root still declares Node >=20, and this is a development-only path (the production-only audit remains clean); Node 20 was not the qualified toolchain. No --force install, downgrade, audit threshold change or dependency path removal was used. The strict gate remains enabled.
+
+### Supported-v15 ports
+
+Five separate incremental code commits implement the requested upstream fixes:
+
+- 7060a2af662ff89c39c34a5ef5dd00c6df065a5d ← ab972d7b9392a79991da9aa45963e3f6a3ae1927: scheduled workflows remain enabled after transient failures; persistent parsing/configuration errors remain distinguishable.
+- f1122ecee94281c843fbd0bae07c9d8b453e1b20 ← 85b0721bc6f8a45c6a0ccf4b83dd69ee30543aba: Arch package names and versions follow accepted formats.
+- 4de1973bd827bc470965cea299f39b69cacd65f7 ← 0d5d66fbd67046740abc72946e9b546e7e8840b1: numeric Arch package epochs are accepted and malformed epochs rejected.
+- 9469bb1df6e83859a365cb1b97bd9643c00d38c8 ← 65ca1b0dbea21e1af3bc45dbfd7cad38913f078f: new tags avoid an unnecessary attribute load while stored releases still load attributes.
+- 29ce164cce525a5f6e98b9b55e7f70776df207b4 ← 4dd2cb29351a87afb8a41cf0a70d50ce0b0fad4c: FilesInit sets LatestSha to the initialized default branch head, with an integration regression.
+
+The mirror-reference change efa00103570af0d7ad5eea92be9a02fa209459b2 remains BLOCKED because supported v15 has no qualified force-push history storage/migration prerequisite. The test-only ee9ea7512bff1bbc466539b780299862f9f0569d helper migration is dispositioned separately in the ledger; it has no production behavior change and the new regression already uses forgery.CreateRepository. Full dispositions and mappings are in docs/p027-v15-ledger.csv and docs/p028-commit-map.csv.
+
+### Local validation
+
+On source 29ce164cce525a5f6e98b9b55e7f70776df207b4:
+
+- Node 24.19.0 / npm 11.9.0 npx vitest run: PASS, 26 files / 103 tests.
+- make GO=/workspace/.tools/go1.27.1/bin/go -B frontend: PASS, production webpack build with webpack 5.105.4. The application embeds the generated assets; generated outputs are ignored and no asset bundle was committed.
+- Strict full audit and production-only audit at severity moderate: PASS, zero findings in each; production-only coverage remains separately represented.
+- Go 1.26.11 go mod verify: PASS; SQLite-tagged production build: PASS.
+- Go 1.26.11 focused package tests for ./models/actions ./services/actions ./modules/packages/arch ./models/repo ./services/release: PASS. Focused vet for those packages plus ./tests/forgery ./tests/integration: PASS.
+- Go 1.26.11 TestFilesInitPopulatesLatestSha with SQLite integration tags: PASS. Focused package tests and vet plus the FilesInit integration regression also passed earlier with Go 1.27.1; final hosted qualification will use the exact pushed source.
+- Exact-source hosted Go vulnerability scan, Vitest/webpack/strict-audit workflow, Go integration workflow, stock/A7 runtime matrix, production build and artifact provenance: NOT RUN for the new head. Prior results for 561abf5c and c04a359 do not qualify these commits.
+
+P028 remains PARTIAL — RESUMABLE pending exact-source hosted qualification. Physical-device tests remain DEFERRED — OWNER APPROVED. The next action is to verify the remote branch is still at c04a35987afa60e923f2ade848f6d0f5b2a67ce5, push these incremental commits and records, then capture resulting workflow run IDs, job results and artifact digests in this handoff and Draft PR #11.
