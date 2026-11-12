@@ -515,8 +515,8 @@ The baseline graph and changes were checked package by package:
 
 - Direct typescript-eslint 8.56.1 brought @typescript-eslint parser, plugin, type-utils, utils and typescript-estree at 8.56.1; the package advisory also surfaced the nested @typescript-eslint/typescript-estree/node_modules/minimatch 10.2.6. The tool suite moved to 8.72.2 without changing its major. Its declared peers accept ESLint 9 and TypeScript 5.9; the current Node 24 test and webpack build pass.
 - Direct eslint-plugin-sonarjs 4.2.2 had nested minimatch 10.2.6. Direct markdownlint-cli 0.50.0 had nested minimatch 10.2.6. Both now resolve to minimatch 11.0.8 through the scoped override. Other affected nested minimatch copies were under editorconfig 1.0.7, js-beautify 1.15.4 and read-package-json 6.0.4, at versions 9.0.9 or 10.2.6. The fixed advisory boundary is below 11.0.1; current development copies are 11.0.8. Existing production minimatch 11.0.1 is already outside that vulnerable range and remains unchanged.
-- js-beautify was transitive through @vue/test-utils 2.4.6 and brought vulnerable editorconfig 1.0.7 plus glob 10.5.0 copies under itself and read-package-json. Updating @vue/test-utils to 2.5.1 selected js-beautify 2.0.3; overrides now select editorconfig 4.0.0 and glob 14.0.5. The glob advisory affects versions through 14.0.1. read-package-json remains reachable through the development-only license-checker-rseidelsohn chain, with its glob fixed to 14.0.5.
-- typescript-eslint 8.72.2, minimatch 11.0.8, glob 14.0.5 and editorconfig 4.0.0 satisfy the current CI Node 24 toolchain; editorconfig 4.0.0 requires Node >=22. The repository root still declares Node >=20, and this is a development-only path (the production-only audit remains clean); Node 20 was not the qualified toolchain. No --force install, downgrade, audit threshold change or dependency path removal was used. The strict gate remains enabled.
+- js-beautify was transitive through @vue/test-utils 2.4.6 and brought vulnerable editorconfig 1.0.7 plus glob 10.5.0 copies under itself and read-package-json. Updating @vue/test-utils to 2.5.1 selected js-beautify 2.0.3; overrides select editorconfig 3.0.2 and glob 14.0.5. A scoped editorconfig override selects minimatch 11.0.8. The glob advisory affects versions through 14.0.1. read-package-json remains reachable through the development-only license-checker-rseidelsohn chain, with its glob fixed to 14.0.5.
+- The audit fix uses editorconfig 3.0.2 (Node >=20) and minimatch 11.0.8 (Node 20 or >=22), preserving the declared Node 20 compatibility of that path. The full Node 20.19.5 frontend tests and webpack build passed. npm emitted EBADENGINE warnings for separate existing development tools that declare Node 22/24; the repository's hosted and qualified frontend toolchain is Node 24. The strict audit remains enabled. No --force install, downgrade, audit threshold change or dependency path removal was used.
 
 ### Supported-v15 ports
 
@@ -529,7 +529,7 @@ Baseline audit entries (13 total) and their dependency paths are itemized below.
 | @typescript-eslint/type-utils | Transitive: typescript-eslint → eslint-plugin → type-utils; advisory path included typescript-estree and utils | Updated the suite to 8.72.2. |
 | @typescript-eslint/typescript-estree | Transitive through parser, type-utils and utils; nested minimatch 10.2.6 | Updated the suite to 8.72.2 and scoped minimatch to 11.0.8. |
 | @typescript-eslint/utils | Transitive: typescript-eslint → eslint-plugin / type-utils → utils; advisory path included typescript-estree | Updated the suite to 8.72.2. |
-| editorconfig | Transitive: @vue/test-utils 2.4.6 → js-beautify 1.15.4 → editorconfig 1.0.7 → nested minimatch 9.0.9 | @vue/test-utils 2.5.1 selects js-beautify 2.0.3; editorconfig 4.0.0 and minimatch 11.0.8 are fixed. editorconfig 4 requires Node 22; CI Node 24 qualifies this dev-only path. |
+| editorconfig | Transitive: @vue/test-utils 2.4.6 → js-beautify 1.15.4 → editorconfig 1.0.7 → nested minimatch 9.0.9 | @vue/test-utils 2.5.1 selects js-beautify 2.0.3; editorconfig 3.0.2 and its scoped minimatch 11.0.8 override are fixed and support Node 20. |
 | eslint-plugin-sonarjs | Direct 4.2.2 → nested minimatch 10.2.6 | Kept the direct tool; the scoped minimatch 11.0.8 override fixes its vulnerable transitive dependency. |
 | glob | Two transitive copies: js-beautify/node_modules/glob 10.5.0 and read-package-json/node_modules/glob 10.5.0 | Both copies use 14.0.5, above the advisory range through 14.0.1. |
 | js-beautify | Transitive: @vue/test-utils 2.4.6 → js-beautify 1.15.4; findings came through editorconfig and glob | @vue/test-utils 2.5.1 selects js-beautify 2.0.3, whose editorconfig and glob paths are explicitly fixed. |
@@ -575,3 +575,79 @@ The hosted runs below checked out PR head 7bf526ed9e48d1c7c4c179105b5d581fe66e92
 The artifact upload logs and GitHub artifact metadata agree on the archive digests above. The production and A7 workflows also wrote payload SHA-256 manifests and verified binary/code-signing requirements. A direct artifact download for an additional local archive re-hash returned HTTP 403 from GitHub artifact blob storage, so the independent verification evidence is the workflow's build/checksum validation and matching upload/API digests.
 
 The current strict frontend audit reports zero findings; the previous 13 moderate development-only findings are resolved, and the local production-only audit also passes with zero findings. The supported-v15 ports and dispositioned test-only migration are complete and hosted checks pass. Mirror-reference change efa00103570af0d7ad5eea92be9a02fa209459b2 remains **BLOCKED** until its force-push history prerequisite exists and is qualified. Physical-device tests remain **DEFERRED — OWNER APPROVED**. PR #11 remains Open Draft on ios/p027-security-port; production iOS is unchanged. P028 remains PARTIAL — RESUMABLE because the mirror-reference prerequisite is still outstanding.
+
+## Node 20 audit-path compatibility and exact-source qualification — 2026-11-12
+
+The remaining editorconfig Node-engine concern was addressed in commit
+`c0cb147fc83d845dc8a3071af302af3e7c5f7a84`. `@vue/test-utils` 2.5.1 continues
+to select js-beautify 2.0.3; the lock now resolves editorconfig 3.0.2 (declares
+Node >=20) and scopes minimatch 11.0.8 to editorconfig. `glob` remains 14.0.5.
+This keeps the audited path compatible with the repository's declared Node 20
+minimum without downgrading packages or weakening the audit gate.
+
+Local validation on this dependency source under Node 20.19.5/npm 11.9:
+
+- Full strict `npm audit --audit-level=moderate`: **PASS**, zero findings.
+- Production-only `npm audit --omit=dev --audit-level=moderate`: **PASS**, zero findings.
+- Vitest: **PASS**, 26 files / 103 tests.
+- Webpack production frontend build: **PASS**, webpack 5.105.4.
+
+Node 20 reported `EBADENGINE` warnings for other existing development tools
+whose own declarations require Node 22/24 (including spectral-cli, markdownlint
+and related packages); the tests and production frontend build above still
+passed. CI and the supported hosted frontend toolchain use Node 24.
+
+Exact-source hosted qualification checked commit
+`c0cb147fc83d845dc8a3071af302af3e7c5f7a84`:
+
+- Host security run
+  [43151240932](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/43151240932):
+  **PASS**. Security job `130960616786` passed unit/SQLite and API/workflow
+  trust integration checks. Frontend job `130960616627` passed `npm ci`, 26
+  Vitest files / 103 tests, webpack 5.105.4 production build, and strict full
+  `npm audit --json` with exit 0. Vulnerability job `130960616870` passed all
+  scanner fixtures and the full module/package/symbol scan as `VERIFIED PASS`,
+  all listed packages covered with no exclusions. Artifacts: frontend audit
+  `13914261723`, 317 bytes, SHA-256
+  `c38e6aabbe22c76b907a5fb533e405415bce890efebc8478a3c984995eb080ef`; full
+  vulnerability evidence `13914555920`, 386,377 bytes, SHA-256
+  `b5b20b4afe3604d30eee8793e9d6dfdad334fb77fbfacec8a3a3783894f725bd`.
+- Production build run
+  [43151240966](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/43151240966),
+  job `130960616657`: **PASS** using Go 1.26.11. Build inspection and ad-hoc
+  code-sign requirement passed. Artifact `13913927390`, 74,975,290 bytes,
+  archive SHA-256
+  `6449edd4ccbb139b55d16ed1f72ad4cef606450b815450cd04688fa58b3d010f`.
+  Payload checksums: pristine binary
+  `5aab51ba6a3526bf617eb24590542099c49cb7d7878f6371a36ff5ef871a261d`; signed
+  binary `07a4fb47ee22bee231ce07e76ab306b469c177f98265c900f281055ef5c6bd56`.
+- A7 and stock runtime run
+  [43151240915](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/43151240915):
+  **PASS**. Patched A7 job `130960616575` and stock Linux Go 1.26.11 regression
+  job `130960616902` passed launcher, lifecycle, backup/restore and security
+  surface checks. Artifact `13914660238`, 75,697,591 bytes, archive SHA-256
+  `3b3d1b6c097f5067e6b72f4d057bd6b1caf6a5522d0eb22d4971c45b98b420f1`.
+  Payload checksums: pristine binary
+  `0f4dccf43311273d89b0037378ec2756cbc0c73b00e3c966cc303d69660dbe22`; patched
+  A7 binary `157d969e12f24440d95b354d799b70e423fc162f7ec32bd6757a03f06cd2b22b`;
+  runtime probe `a641daaf236a74bc313785306edb4100761e8754a3ce1ab3c811d3d55f18560d`.
+- Runtime compatibility matrix run
+  [43151240939](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/43151240939),
+  job `130960616696`: **PASS**. Artifact `13913612431`, 4,062,870 bytes,
+  SHA-256 `973cd7db58dcccb8f298a852db46fe93c246a21835532827cdc68b64985c89f9`.
+
+The GitHub artifact metadata digests match each upload log. Production and A7
+jobs also emitted the payload SHA-256 values above and passed their in-workflow
+inspection/provenance checks. As recorded earlier, direct local download for an
+additional archive re-hash was denied by GitHub artifact blob storage with HTTP
+403; no local re-hash is claimed.
+
+The exact-source frontend and security gates now pass with zero npm findings;
+the previous 13 moderate findings were development-tooling advisories and are
+resolved. All five prioritized supported-v15 ports are covered by this exact
+head's Go regressions/builds. Mirror-reference change
+`efa00103570af0d7ad5eea92be9a02fa209459b2` remains **BLOCKED** until its
+force-push history prerequisite exists and is qualified. PR #11 remains Open
+Draft on the P027 base. Physical-device tests remain **DEFERRED — OWNER
+APPROVED**; production `iOS` is unchanged. Overall P028 remains
+**PARTIAL — RESUMABLE** because of the mirror-reference prerequisite.
