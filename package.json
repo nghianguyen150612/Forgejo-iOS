@@ -90,7 +90,7 @@
     "@vitejs/plugin-vue": "6.0.3",
     "@vitest/coverage-v8": "4.1.12",
     "@vitest/eslint-plugin": "1.6.9",
-    "@vue/test-utils": "2.4.6",
+    "@vue/test-utils": "2.5.1",
     "eslint": "9.39.4",
     "eslint-import-resolver-typescript": "4.4.4",
     "eslint-plugin-array-func": "5.1.1",
@@ -118,9 +118,10 @@
     "stylelint-value-no-unknown-custom-properties": "6.1.1",
     "svgo": "4.1.0",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.56.1",
+    "typescript-eslint": "8.72.2",
     "vite-string-plugin": "2.0.0",
-    "vitest": "4.1.12"
+    "vitest": "4.1.12",
+    "minimatch": "11.0.8"
   },
   "browserslist": [
     "defaults"
@@ -129,6 +130,14 @@
     "enabled": false
   },
   "overrides": {
-    "katex": "$katex"
+    "katex": "$katex",
+    "js-beautify": {
+      "glob": "^14.0.5",
+      "editorconfig": "^4.0.0"
+    },
+    "read-package-json": {
+      "glob": "^14.0.5"
+    },
+    "minimatch@^10.2.6": "11.0.8"
   }
 }
