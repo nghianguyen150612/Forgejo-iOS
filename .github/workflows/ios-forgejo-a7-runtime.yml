@@ -333,3 +333,33 @@ jobs:
           set -euo pipefail
           go version
           GOTOOLCHAIN=local make build TAGS='bindata timetzdata sqlite sqlite_unlock_notify'
+
+  verify-a7-artifact:
+    needs: [forgejo-a7-runtime, linux-stock-regression]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Download artifact from the A7 build job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ios-forgejo-a7-runtime
+          path: ${{ runner.temp }}/ios-forgejo-a7-runtime
+      - name: Independently verify A7 artifact checksum, architecture, and source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_root="$RUNNER_TEMP/ios-forgejo-a7-runtime"
+          checksum_file="$(find "$artifact_root" -path '*/build/ios/forgejo-ios-a7-SHA256SUMS' -print -quit)"
+          test -n "$checksum_file"
+          build_dir="$(dirname "$checksum_file")"
+          grep -Fx "Git commit=$EXPECTED_SOURCE_SHA" "$build_dir/forgejo-ios-a7-build-info.txt"
+          grep -Fx 'Runtime: go1.26.11-a7' "$build_dir/forgejo-ios-status.txt"
+          grep -Fx 'SQLite: enabled' "$build_dir/forgejo-ios-status.txt"
+          test "$(awk '{print $2}' "$checksum_file" | LC_ALL=C sort)" = "$(printf '%s\n' forgejo-ios-a7 forgejo-ios-a7-pristine go126-a7-multip-probe | LC_ALL=C sort)"
+          (cd "$build_dir" && sha256sum -c forgejo-ios-a7-SHA256SUMS)
+          for binary in forgejo-ios-a7-pristine forgejo-ios-a7; do
+            test -s "$build_dir/$binary"
+            file "$build_dir/$binary" | grep -F 'Mach-O 64-bit executable arm64'
+          done
