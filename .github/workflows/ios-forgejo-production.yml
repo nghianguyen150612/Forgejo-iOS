@@ -212,5 +212,5 @@ jobs:
           sha256sum -c SHA256SUMS
           for binary in forgejo-ios-pristine forgejo-ios; do
             test -s "$binary"
-            file "$binary" | grep -F 'Mach-O 64-bit executable arm64'
+            file "$binary" | grep -E 'Mach-O 64-bit (arm64 executable|executable arm64)'
           done

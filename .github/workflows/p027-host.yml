@@ -34,7 +34,7 @@ jobs:
       - name: Build backend required by integration subprocesses
         run: make backend TAGS='sqlite sqlite_unlock_notify'
       - name: API and workflow trust integration checks
-        run: make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(ForgeryCreateTeamUnitPersistence|APIModifyLabels|PackageNuGet|ActionsForkPullRequest|APIStar|APIWatch|PullAutoMergeFromFork|GitPushConcurrentBranchUpdate|ActionsAPIWorkflowDispatch|APIOrgEdit|ActionsFinishLogs|ActionsDownloadTask)'"
+        run: make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(ForgeryCreateTeamUnitPersistence|PullViewConversation|ActionsForcePushCommitStatus|APIModifyLabels|PackageNuGet|ActionsForkPullRequest|APIStar|APIWatch|PullAutoMergeFromFork|GitPushConcurrentBranchUpdate|ActionsAPIWorkflowDispatch|APIOrgEdit|ActionsFinishLogs|ActionsDownloadTask)'"
 
   vulnerabilities:
     runs-on: ubuntu-latest
