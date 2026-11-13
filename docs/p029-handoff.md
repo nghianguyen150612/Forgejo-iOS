@@ -72,12 +72,23 @@ Dispatched on this exact checkpoint:
 | Run | Scope | Last observed status |
 | --- | --- | --- |
 | 43352182584 | Host units, authorization/Actions trust integration, full vulnerability scans, Vitest, production frontend, strict npm audit | NOT RUN — jobs queued |
-| 43352185643 | Production native build and independent provenance consumer | NOT RUN — queued |
+| 43352185643 | Production native build and independent provenance consumer | Build PASS; hosted consumer NOT RUN — queued |
 | 43352189209 | A7 native build, stock runtime regression, independent consumer | NOT RUN — queued |
-| 43352192396 | Runtime compatibility matrix | NOT RUN — queued |
+| 43352192396 | Runtime compatibility matrix | PASS |
 
 Local focused application suite **PASS**: `TestP029ForcePushCompatibilityBaseline`, `TestPullViewConversation`, `TestActionsForcePushCommitStatus`, `TestForgeryCreateTeamUnitPersistence`. Existing host unit package selection from `p027-host.yml` **PASS**. Existing `TestForgejoDownloadRepo` and `TestGiteaDownloadRepo` migration regressions **PASS**. `go mod verify` **PASS**; `go mod tidy -diff` **PASS**. Full `go vet -p 2 ./...` subsequently completed **PASS** (exit 0). Sanitized local results and log SHA-256 values are retained in [local evidence](p029-force-push-local-evidence.json).
 
 Additional existing `TestGitPushConcurrentBranchUpdate` and `TestMirrorPush` returned **PASS**, exercising synthetic HTTP receive hooks and mirror setup/sync/remote repair/cleanup. The latter also emitted a testlogger error (`fork/exec .../git: no such file or directory`) during its synthetic request; do not treat this as clean qualification of new pin/mirror behavior. No new force-push namespace implementation was tested. The port remains **BLOCKED**.
 
 Next exact action: inspect the four run IDs above, record terminal outcomes and new artifact IDs/digests on the exact SHA, and preserve the distinction between existing application qualification and test/workflow checkpoint qualification. No future result is assumed.
+
+
+### Latest hosted and artifact checkpoint
+
+- Runtime matrix run `43352192396`: **PASS** for test/workflow source `67e337fc5f07b4857bafd4d7fffa73ca840474e8`.
+- Production job `131645644229`: **PASS**; hosted consumer `131648710336`: **NOT RUN — queued**. Independent local download/verification **PASS**: artifact `14005390122`, ZIP SHA-256 `273c4eb3b05aa8b05a9ffc33fe86820ac6b01c519690ca6ce6e8096ca610e29a`, exact source SHA, Go 1.26.11, `GOOS=ios`, arm64/iOS 12.0 and both binary checksums. Full binary hashes/metadata: [production artifact verification](p029-production-artifact-verification.json). This does not substitute for the A7 runtime build.
+- Fresh host run `43352182584` and A7/stock run `43352189209`: **NOT RUN — queued** at the saved [CI snapshot](p029-ci-snapshot.json). No old scan/native result is reused to mark this new checkpoint PASS.
+- The four runs are not terminal PASS collectively. No additional retry was made; no future result is assumed. The force-push prerequisite and mirror change remain **BLOCKED** for the precise application-lifecycle reasons already documented.
+- Final branch may contain documentation/evidence-only commits after tested checkpoint `67e337fc5f07b4857bafd4d7fffa73ca840474e8`; compare the final HEAD with that checkpoint before resuming. Application implementation remains exactly as qualified at `67a54b38`.
+
+**P029: PARTIAL — RESUMABLE.** Next exact action: inspect `43352182584`, `43352185643`, `43352189209` (and their job annotations if acquisition fails), then record terminal outcomes and new A7/security artifacts. Keep the mirror port excluded until durable SQL/Git reconciliation, dual-layout protection and safe cleanup are implemented and application-tested. Production modifications **NONE**; device validation **DEFERRED — OWNER APPROVED**.
