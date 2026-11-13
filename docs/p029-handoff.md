@@ -33,7 +33,7 @@ This handoff update changes documentation only after the tested source SHA. The 
 
 No release was created and no production installation or physical device was touched.
 
-## Force-push history prerequisite
+## Force-push history prerequisite (prior checkpoint; superseded by review below)
 
 **BLOCKED — FORCE-PUSH HISTORY PREREQUISITE.**
 
@@ -48,3 +48,16 @@ Synthetic Git tests ran only in isolated temporary repositories at `/tmp/p029-fo
 - **DEFERRED — OWNER APPROVED:** physical-device validation. Host native builds do not establish device execution.
 - **NOT RUN:** app-level force-push history lifecycle/migration qualification, and physical-device testing.
 - **NEXT:** design and test v15 migration and lifecycle behavior for old and new force-push ref namespaces, including mirror push and PR deletion; then rerun the existing exact-source host, A7, runtime matrix, and artifact checks on any new source SHA.
+
+
+## 2026-11-13 recovered checkpoint and compatibility decision
+
+- Recovery confirmed clean local checkout and origin at `ed5b66ff634224d80e6375620a8a74a34b359bc5`; existing Draft PR #12 and P028 base unchanged. Changes since qualified application source `67a54b38c829357f3c943d53f1fd1946f1bc664a` were documentation only at recovery.
+- Rechecked all four exact-source hosted workflows listed above: each remains completed/success. Their production/A7 artifacts qualify that application source; they do not qualify new test/workflow commits.
+- **PASS — synthetic application baseline**, Go 1.26.11, `sqlite sqlite_unlock_notify`: `make backend TAGS='sqlite sqlite_unlock_notify'`, then `make test-sqlite GOTESTCOMPILEDRUNSUFFIX='-test.run=TestP029ForcePushCompatibilityBaseline -test.v'`. Actual SQL comment creation, repeated event, history loading, HTTP historical commit view, missing-object failure before insert, valid retry, timeline deletion, PR deletion, legacy/new pin retention, and surviving Git object assertions passed. This explicitly characterizes unsupported behavior, not a passing port. Initial test launch lacked the backend binary; building the backend and rerunning resolved that setup failure.
+- **PASS — module verification:** `go mod verify`, all modules verified. Official Go 1.26.11 Linux toolchain archive was checked against the go.dev release JSON SHA-256 (`9849f4e04ee35303714e34fbc3ac8ab44ea3e448a95aa182f91e3b9b79c710ec`).
+- **BLOCKED — compatibility decision:** neither prerequisite nor mirror change imported. Precise SQL/Git transaction, retry, hook, hidden-ref, legacy namespace, mirror and deletion findings, test coverage limits, and future architecture are in [p029-force-push-compatibility.md](p029-force-push-compatibility.md). The upstream prerequisite writes refs after SQL commit, lacks error checking before dereferencing the created comment, and cannot recover partial ref writes or duplicate retries. The mirror change assumes development receive-hook behavior missing from v15. A safe port requires broader durable event/reconciliation work, not a namespace-only patch.
+- Added the synthetic baseline to the existing host workflow selection. No application behavior, dependency, native toolchain, scheduled watcher, security threshold, production branch, or release policy changed.
+- New-checkpoint exact-source CI: **NOT RUN** until the test/workflow checkpoint is committed and dispatched; old results are retained only for their exact application source. Device qualification remains **DEFERRED — OWNER APPROVED**.
+
+Next executable action: run the existing host, production, A7/stock-runtime and matrix workflows on the new test/workflow checkpoint; record exact run IDs/outcomes. Keep the two force-push changes BLOCKED pending the architecture and application lifecycle tests in the compatibility decision.
