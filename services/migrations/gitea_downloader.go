@@ -19,6 +19,7 @@ import (
 	"forgejo.org/services/migrations/allowlist"
 
 	gitea_sdk "code.gitea.io/sdk/gitea"
+	"github.com/hashicorp/go-version"
 )
 
 var (
@@ -29,6 +30,14 @@ var (
 func init() {
 	RegisterDownloaderFactory(&GiteaDownloaderFactory{})
 }
+
+var (
+	// Unlike version.Constraints.Check, Version.GreaterThanOrEqual keeps the
+	// prerelease portion of Forgejo's advertised version from disabling APIs.
+	v1_11 = version.Must(version.NewSemver("v1.11"))
+	v1_12 = version.Must(version.NewSemver("v1.12"))
+	v1_14 = version.Must(version.NewSemver("v1.14"))
+)
 
 // GiteaDownloaderFactory defines a gitea downloader factory
 type GiteaDownloaderFactory struct{}
@@ -83,6 +92,7 @@ type GiteaDownloader struct {
 	ctx        context.Context
 	client     *gitea_sdk.Client
 	baseURL    string
+	version    *version.Version
 	repoOwner  string
 	repoName   string
 	pagination bool
@@ -96,10 +106,15 @@ type GiteaDownloader struct {
 func NewGiteaDownloader(ctx context.Context, giteaClient *gitea_sdk.Client, baseURL, repoPath string) (*GiteaDownloader, error) {
 	path := strings.Split(repoPath, "/")
 
-	paginationSupport := true
-	if err := giteaClient.CheckServerVersionConstraint(">=1.12"); err != nil {
-		paginationSupport = false
+	rawVersion, _, err := giteaClient.ServerVersion()
+	if err != nil {
+		return nil, fmt.Errorf("could not get server version: %w", err)
 	}
+	serverVersion, err := version.NewVersion(rawVersion)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse server version: %w", err)
+	}
+	paginationSupport := serverVersion.GreaterThanOrEqual(v1_12)
 
 	// set small maxPerPage since we can only guess
 	// (default would be 50 but this can differ)
@@ -118,6 +133,7 @@ func NewGiteaDownloader(ctx context.Context, giteaClient *gitea_sdk.Client, base
 		ctx:        ctx,
 		client:     giteaClient,
 		baseURL:    baseURL,
+		version:    serverVersion,
 		repoOwner:  path[0],
 		repoName:   path[1],
 		pagination: paginationSupport,
@@ -356,7 +372,7 @@ func (g *GiteaDownloader) GetReleases() ([]*base.Release, error) {
 
 func (g *GiteaDownloader) getIssueReactions(index int64) ([]*base.Reaction, error) {
 	var reactions []*base.Reaction
-	if err := g.client.CheckServerVersionConstraint(">=1.11"); err != nil {
+	if !g.version.GreaterThanOrEqual(v1_11) {
 		log.Info("GiteaDownloader: instance too old, skip getIssueReactions")
 		return reactions, nil
 	}
@@ -377,7 +393,7 @@ func (g *GiteaDownloader) getIssueReactions(index int64) ([]*base.Reaction, erro
 
 func (g *GiteaDownloader) getCommentReactions(commentID int64) ([]*base.Reaction, error) {
 	var reactions []*base.Reaction
-	if err := g.client.CheckServerVersionConstraint(">=1.11"); err != nil {
+	if !g.version.GreaterThanOrEqual(v1_11) {
 		log.Info("GiteaDownloader: instance too old, skip getCommentReactions")
 		return reactions, nil
 	}
@@ -609,7 +625,7 @@ func (g *GiteaDownloader) GetPullRequests(page, perPage int) ([]*base.PullReques
 		return nil, false, fmt.Errorf("error while listing pull requests (page: %d, pagesize: %d). Error: %w", page, perPage, err)
 	}
 
-	if g.client.CheckServerVersionConstraint(">= 1.14.0") != nil {
+	if !g.version.GreaterThanOrEqual(v1_14) {
 		for i := range prs {
 			if err := g.fixPullHeadSha(prs[i]); err != nil {
 				return nil, false, fmt.Errorf("error while listing pull requests (page: %d, pagesize: %d). Error: %w", page, perPage, err)
@@ -723,7 +739,7 @@ func (g *GiteaDownloader) GetPullRequests(page, perPage int) ([]*base.PullReques
 
 // GetReviews returns pull requests review
 func (g *GiteaDownloader) GetReviews(reviewable base.Reviewable) ([]*base.Review, error) {
-	if err := g.client.CheckServerVersionConstraint(">=1.12"); err != nil {
+	if !g.version.GreaterThanOrEqual(v1_12) {
 		log.Info("GiteaDownloader: instance too old, skip GetReviews")
 		return nil, nil
 	}

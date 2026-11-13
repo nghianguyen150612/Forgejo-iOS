@@ -20,7 +20,8 @@ type CreateTeamOptions struct {
 	Name             string
 	CanCreateOrgRepo bool
 
-	Mode perm.AccessMode
+	Mode  perm.AccessMode
+	Units []*org_model.TeamUnit
 
 	Members []*user_model.User
 }
@@ -44,22 +45,35 @@ func CreateTeam(t *testing.T, org *org_model.Organization, opts *CreateTeamOptio
 		LowerName:               opts.Name,
 		IncludesAllRepositories: true,
 		AccessMode:              opts.Mode,
+		Units:                   opts.Units,
 		CanCreateOrgRepo:        opts.CanCreateOrgRepo,
 	}
 	require.NoError(t, db.Insert(t.Context(), team))
 
 	units := make([]org_model.TeamUnit, 0, len(unit_model.AllRepoUnitTypes))
-	for _, tp := range unit_model.AllRepoUnitTypes {
-		up := opts.Mode
-		if tp == unit_model.TypeExternalTracker || tp == unit_model.TypeExternalWiki {
-			up = perm.AccessModeRead
+	if len(opts.Units) > 0 {
+		for _, unit := range opts.Units {
+			require.NotNil(t, unit)
+			units = append(units, org_model.TeamUnit{
+				OrgID:      org.ID,
+				TeamID:     team.ID,
+				Type:       unit.Type,
+				AccessMode: unit.AccessMode,
+			})
 		}
-		units = append(units, org_model.TeamUnit{
-			OrgID:      org.ID,
-			TeamID:     team.ID,
-			Type:       tp,
-			AccessMode: up,
-		})
+	} else {
+		for _, tp := range unit_model.AllRepoUnitTypes {
+			up := opts.Mode
+			if tp == unit_model.TypeExternalTracker || tp == unit_model.TypeExternalWiki {
+				up = perm.AccessModeRead
+			}
+			units = append(units, org_model.TeamUnit{
+				OrgID:      org.ID,
+				TeamID:     team.ID,
+				Type:       tp,
+				AccessMode: up,
+			})
+		}
 	}
 
 	require.NoError(t, db.Insert(t.Context(), &units))
