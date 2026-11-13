@@ -61,3 +61,23 @@ Synthetic Git tests ran only in isolated temporary repositories at `/tmp/p029-fo
 - New-checkpoint exact-source CI: **NOT RUN** until the test/workflow checkpoint is committed and dispatched; old results are retained only for their exact application source. Device qualification remains **DEFERRED — OWNER APPROVED**.
 
 Next executable action: run the existing host, production, A7/stock-runtime and matrix workflows on the new test/workflow checkpoint; record exact run IDs/outcomes. Keep the two force-push changes BLOCKED pending the architecture and application lifecycle tests in the compatibility decision.
+
+
+### Exact test/workflow checkpoint `67e337fc5f07b4857bafd4d7fffa73ca840474e8`
+
+Pushed normally to the existing P029 branch. The delta from `67a54b38` contains documentation, the new integration baseline and its host workflow selection only; no application implementation or dependencies changed. Later handoff-only commits must be reported separately from this CI checkpoint.
+
+Dispatched on this exact checkpoint:
+
+| Run | Scope | Last observed status |
+| --- | --- | --- |
+| 43352182584 | Host units, authorization/Actions trust integration, full vulnerability scans, Vitest, production frontend, strict npm audit | NOT RUN — jobs queued |
+| 43352185643 | Production native build and independent provenance consumer | NOT RUN — queued |
+| 43352189209 | A7 native build, stock runtime regression, independent consumer | NOT RUN — queued |
+| 43352192396 | Runtime compatibility matrix | NOT RUN — queued |
+
+Local focused application suite **PASS**: `TestP029ForcePushCompatibilityBaseline`, `TestPullViewConversation`, `TestActionsForcePushCommitStatus`, `TestForgeryCreateTeamUnitPersistence`. Existing host unit package selection from `p027-host.yml` **PASS**. Existing `TestForgejoDownloadRepo` and `TestGiteaDownloadRepo` migration regressions **PASS**. `go mod verify` **PASS**; `go mod tidy -diff` **PASS**. Full `go vet -p 2 ./...` remains running at this checkpoint.
+
+Additional existing `TestGitPushConcurrentBranchUpdate` and `TestMirrorPush` returned **PASS**, exercising synthetic HTTP receive hooks and mirror setup/sync/remote repair/cleanup. The latter also emitted a testlogger error (`fork/exec .../git: no such file or directory`) during its synthetic request; do not treat this as clean qualification of new pin/mirror behavior. No new force-push namespace implementation was tested. The port remains **BLOCKED**.
+
+Next exact action: inspect the four run IDs above, record terminal outcomes and new artifact IDs/digests on the exact SHA, and preserve the distinction between existing application qualification and test/workflow checkpoint qualification. No future result is assumed.
