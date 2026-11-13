@@ -76,7 +76,7 @@ Dispatched on this exact checkpoint:
 | 43352189209 | A7 native build, stock runtime regression, independent consumer | NOT RUN — queued |
 | 43352192396 | Runtime compatibility matrix | NOT RUN — queued |
 
-Local focused application suite **PASS**: `TestP029ForcePushCompatibilityBaseline`, `TestPullViewConversation`, `TestActionsForcePushCommitStatus`, `TestForgeryCreateTeamUnitPersistence`. Existing host unit package selection from `p027-host.yml` **PASS**. Existing `TestForgejoDownloadRepo` and `TestGiteaDownloadRepo` migration regressions **PASS**. `go mod verify` **PASS**; `go mod tidy -diff` **PASS**. Full `go vet -p 2 ./...` remains running at this checkpoint.
+Local focused application suite **PASS**: `TestP029ForcePushCompatibilityBaseline`, `TestPullViewConversation`, `TestActionsForcePushCommitStatus`, `TestForgeryCreateTeamUnitPersistence`. Existing host unit package selection from `p027-host.yml` **PASS**. Existing `TestForgejoDownloadRepo` and `TestGiteaDownloadRepo` migration regressions **PASS**. `go mod verify` **PASS**; `go mod tidy -diff` **PASS**. Full `go vet -p 2 ./...` subsequently completed **PASS** (exit 0). Sanitized local results and log SHA-256 values are retained in [local evidence](p029-force-push-local-evidence.json).
 
 Additional existing `TestGitPushConcurrentBranchUpdate` and `TestMirrorPush` returned **PASS**, exercising synthetic HTTP receive hooks and mirror setup/sync/remote repair/cleanup. The latter also emitted a testlogger error (`fork/exec .../git: no such file or directory`) during its synthetic request; do not treat this as clean qualification of new pin/mirror behavior. No new force-push namespace implementation was tested. The port remains **BLOCKED**.
 
