@@ -20,7 +20,7 @@ func TestForgeryCreateTeamUnitPersistence(t *testing.T) {
 	defer tests.PrepareTestEnv(t)()
 
 	owner := forgery.CreateUser(t, nil)
-	org := forgery.CreateOrganisation(t, owner)
+	org := forgery.CreateOrganisation(t, owner, nil)
 	explicitUnits := []*organization.TeamUnit{
 		{Type: unit_model.TypeCode, AccessMode: perm.AccessModeWrite},
 		{Type: unit_model.TypePullRequests, AccessMode: perm.AccessModeRead},
