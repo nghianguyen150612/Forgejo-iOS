@@ -1,0 +1,28 @@
+{
+  "133189595514": {
+    "decoded_log_sha256": "15eec88d09dcc44e8e4de3623c3aa23fb190a6bf4985612ebd8c3e8910f6ea05",
+    "verification_output": [
+      "Git commit=818531e9441f1687cab442478327e33884ffe8f6",
+      "GO_VERSION=go version go1.26.11 darwin/arm64",
+      "GOOS=ios",
+      "GOARCH=arm64",
+      "forgejo-ios-pristine: OK",
+      "forgejo-ios: OK",
+      "forgejo-ios-pristine: Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|PIE>",
+      "forgejo-ios: Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|PIE>"
+    ]
+  },
+  "133190465586": {
+    "decoded_log_sha256": "c2b8f924f59c3018b04ca03b9e7e566444e23854b634227d3c2edd5d2dfefe72",
+    "verification_output": [
+      "Git commit=818531e9441f1687cab442478327e33884ffe8f6",
+      "Runtime: go1.26.11-a7",
+      "SQLite: enabled",
+      "forgejo-ios-a7-pristine: OK",
+      "forgejo-ios-a7: OK",
+      "go126-a7-multip-probe: OK",
+      "/home/runner/work/_temp/ios-forgejo-a7-runtime/build/ios/forgejo-ios-a7-pristine: Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|PIE>",
+      "/home/runner/work/_temp/ios-forgejo-a7-runtime/build/ios/forgejo-ios-a7: Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|PIE>"
+    ]
+  }
+}

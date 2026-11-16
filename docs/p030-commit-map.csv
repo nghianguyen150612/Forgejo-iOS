@@ -1,0 +1,5 @@
+upstream_sha,ios_source_commit,mapping,regression
+32db264fb3127358eb4d57ba34f506cca60dc9b8,f8db44dd8cf6cbeeb334df1c0b640d98a7ed57a7,Supported v15 organization fixture options; retained P029 team caller adapted,TestP030OrganisationVisibility; TestForgeryCreateTeamUnitPersistence; existing org variable and quota tests
+68932ee9bdf734d5f78b21a21e713d92ab1243e0,f8db44dd8cf6cbeeb334df1c0b640d98a7ed57a7,Authorized repository reuse in v15 ListReleases; no schema or protocol change,TestAPIReleaseListRepositoryQueries; URL assertions in TestAPIReleaseList; full TestAPIRelease* suite
+LOCAL — no upstream SHA,f8db44dd8cf6cbeeb334df1c0b640d98a7ed57a7,Automatic Actions-view test unmount prevents poll/fetch-mock leakage,11 Actions-view and 103 full frontend tests; no assertion or threshold removed
+LOCAL — no upstream SHA,818531e9441f1687cab442478327e33884ffe8f6,Replace query test hook with temporary request-scoped SQL logger; shared engine and tracing preserved,Full selected integration PASS; negative control without reuse FAIL (2 vs 3 queries); restored reuse PASS

@@ -1,0 +1,14 @@
+[
+  {
+    "artifact_id": 14210376571,
+    "archive_sha256": "710d620346dad7d47b9a6f7ec987cff08364418b9d09fd32a12fdd11c1b1b08c",
+    "independent_zip_verification": "PASS",
+    "source_sha": "818531e9441f1687cab442478327e33884ffe8f6"
+  },
+  {
+    "artifact_id": 14209433253,
+    "archive_sha256": "1bcafa3010a6bc310153f92b04d777f13fac1d84dc9b78b8bee97ebc3b1ce657",
+    "independent_zip_verification": "PASS",
+    "source_sha": "818531e9441f1687cab442478327e33884ffe8f6"
+  }
+]
