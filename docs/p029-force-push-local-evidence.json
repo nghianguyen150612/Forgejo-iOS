@@ -1,0 +1,99 @@
+{
+  "checkpoint": "67e337fc5f07b4857bafd4d7fffa73ca840474e8",
+  "application_source": "67a54b38c829357f3c943d53f1fd1946f1bc664a",
+  "go": "1.26.11",
+  "test_tags": [
+    "sqlite",
+    "sqlite_unlock_notify"
+  ],
+  "capture_utc": "2026-11-13T02:33:43.467355+00:00",
+  "compatibility_decision": "BLOCKED",
+  "device_tests": "DEFERRED \u2014 OWNER APPROVED",
+  "production_modifications": "NONE",
+  "results": [
+    {
+      "log": "forgejo-baseline.log",
+      "sha256": "6174c66cb7a0c839c12bbe8564fbf362cfba81a4150ab733e6dfce6adf3b6645",
+      "status": "PASS",
+      "tail": [
+        "    testlogger.go:411: 2026/11/13 02:24:44 ...les/storage/local.go:33:NewLocalStorage() [I] Creating new Local Storage at /workspace/Forgejo-iOS/tests/gitea-lfs-meta",
+        "    testlogger.go:411: 2026/11/13 02:24:44 ...eb/routing/logger.go:109:func1() [I] router: completed GET /user2/commitsonpr/commit/1978192d98bb1b65e11c2cf37da854fbf94bffd6 for test-mock:12345, 200 OK in 45.7ms @ repo/commit.go:299(repo.Diff)",
+        "    testlogger.go:411: 2026/11/13 02:24:44 ...odels/user/avatar.go:59:GenerateRandomAvatar() [I] New random avatar created: 2",
+        "    testlogger.go:411: 2026/11/13 02:24:44 ...odels/user/avatar.go:59:GenerateRandomAvatar() [I] New random avatar created: 2",
+        "    testlogger.go:411: 2026/11/13 02:24:44 ...odels/user/avatar.go:59:GenerateRandomAvatar() [I] New random avatar created: 2",
+        "--- PASS: TestP029ForcePushCompatibilityBaseline (0.40s)",
+        "PASS"
+      ]
+    },
+    {
+      "log": "forgejo-focused.log",
+      "sha256": "435196fce6f36019e7a9d84fbf4bf5de1c8bb6495ddcdd47ffc52a8f7d35e8d6",
+      "status": "PASS",
+      "tail": [
+        "    testlogger.go:411: 2026/11/13 02:25:54 ...eb/routing/logger.go:109:func1() [I] router: completed GET /user2/commitsonpr/pulls/1/commits/3e64625bd6eb5bcba69ac97de6c8f507402df861 for test-mock:12345, 404 Not Found in 34.1ms @ repo/pull.go:1232(repo.ViewPullFilesForSingleCommit)",
+        "    testlogger.go:411: 2026/11/13 02:25:55 ...eb/routing/logger.go:109:func1() [I] router: completed GET /user2/commitsonpr/pulls/1 for test-mock:12345, 200 OK in 48.7ms @ repo/issue.go:1410(repo.ViewIssue)",
+        "--- PASS: TestPullViewConversation (0.33s)",
+        "    --- PASS: TestPullViewConversation/Commits (0.03s)",
+        "    --- PASS: TestPullViewConversation/ForcePush (0.00s)",
+        "    --- PASS: TestPullViewConversation/ForcePush_GC'd_Commits (0.05s)",
+        "PASS"
+      ]
+    },
+    {
+      "log": "forgejo-units.log",
+      "sha256": "a8ac57a1fa9f8310516229176d5c6104a9254640ea8024f83ade122f9ed388a9",
+      "status": "PASS",
+      "tail": [
+        "ok  \tforgejo.org/services/auth\t0.723s [no tests to run]",
+        "ok  \tforgejo.org/services/authz\t1.232s",
+        "ok  \tforgejo.org/services/user\t6.011s",
+        "ok  \tforgejo.org/models/perm/access\t2.030s",
+        "ok  \tforgejo.org/services/issue\t4.820s",
+        "ok  \tforgejo.org/services/actions\t7.232s",
+        "ok  \tforgejo.org/services/repository\t3.267s"
+      ]
+    },
+    {
+      "log": "forgejo-migration.log",
+      "sha256": "baa3dfe4792da69cb1e16115b7d2d785a131a765f2ce4bcfeefe034ef658b38c",
+      "status": "PASS",
+      "tail": [
+        "ok  \tforgejo.org/services/migrations\t1.981s"
+      ]
+    },
+    {
+      "log": "forgejo-module-verify.log",
+      "sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd",
+      "status": "PASS",
+      "tail": [
+        "all modules verified"
+      ]
+    },
+    {
+      "log": "forgejo-tidy.log",
+      "sha256": "b2c12bb11c306370d7e959b9dc43d7a45aafa4512c64c48a19b089ca54984b90",
+      "status": "PASS",
+      "tail": [
+        "go: downloading github.com/hashicorp/go-uuid v1.0.3",
+        "go: downloading github.com/jcmturner/goidentity/v6 v6.0.1",
+        "go: downloading gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7",
+        "go: downloading golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56",
+        "go: downloading github.com/jcmturner/aescts/v2 v2.0.0",
+        "go: downloading github.com/jcmturner/rpc/v2 v2.0.3",
+        "go: downloading github.com/zeebo/pcg v1.0.1"
+      ]
+    },
+    {
+      "log": "forgejo-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "PASS",
+      "tail": []
+    }
+  ],
+  "notes": [
+    "Synthetic baseline PASS characterizes unsupported behavior; it does not qualify the excluded port.",
+    "Full go vet exited 0; tidy diff was empty.",
+    "No production database or repository was used.",
+    "Fresh hosted security/native runs remain pending and are not replaced by these local checks."
+  ]
+}

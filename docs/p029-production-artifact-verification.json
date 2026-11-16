@@ -1,0 +1,40 @@
+{
+  "status": "PASS",
+  "scope": "Independent local production artifact verification; hosted consumer still queued; this is not A7 runtime qualification",
+  "source_sha": "67e337fc5f07b4857bafd4d7fffa73ca840474e8",
+  "run_id": 43352185643,
+  "artifact_id": 14005390122,
+  "archive_sha256": "273c4eb3b05aa8b05a9ffc33fe86820ac6b01c519690ca6ce6e8096ca610e29a",
+  "binaries": {
+    "forgejo-ios": {
+      "sha256": "64f741cf31f11ddea8b23bc975f284135417aad33aeb388617dbe25b5ba0778b",
+      "bytes": 104296288,
+      "macho": {
+        "cpu": "arm64",
+        "filetype": "MH_EXECUTE",
+        "command": "LC_BUILD_VERSION",
+        "platform": 2,
+        "minos": "12.0",
+        "sdk": 1180928,
+        "entry_kind": "file",
+        "entry": 585520
+      }
+    },
+    "forgejo-ios-pristine": {
+      "sha256": "0981f55e7efc976a79774f715e62f32ab36f2a6d7b90d050de8f1132d5ca800a",
+      "bytes": 103469624,
+      "macho": {
+        "cpu": "arm64",
+        "filetype": "MH_EXECUTE",
+        "command": "LC_BUILD_VERSION",
+        "platform": 2,
+        "minos": "12.0",
+        "sdk": 1180928,
+        "entry_kind": "file",
+        "entry": 585520
+      }
+    }
+  },
+  "device_tests": "DEFERRED \u2014 OWNER APPROVED",
+  "production_modifications": "NONE"
+}

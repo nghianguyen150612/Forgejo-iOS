@@ -23,6 +23,7 @@ import (
 	"forgejo.org/modules/cache"
 	"forgejo.org/modules/container"
 	"forgejo.org/modules/git"
+	"forgejo.org/modules/gitrepo"
 	"forgejo.org/modules/log"
 	"forgejo.org/modules/markup"
 	"forgejo.org/modules/optional"
@@ -354,6 +355,26 @@ func (repo *Repository) CommitLink(commitID string) (result string) {
 		result = repo.Link() + "/commit/" + url.PathEscape(commitID)
 	}
 	return result
+}
+
+// IsCommitValid reports whether commitID resolves to a commit object in this repository.
+func (repo *Repository) IsCommitValid(ctx context.Context, commitID string) bool {
+	gitRepo, closer, err := gitrepo.RepositoryFromContextOrOpen(ctx, repo)
+	if err != nil {
+		log.Error("failed to open repository while checking commit %s: %v", commitID, err)
+		return false
+	}
+	defer closer.Close()
+
+	// In this v15 codebase ConvertToGitID validates only the object ID syntax. GetCommit
+	// also checks that the object still exists and is a commit, which handles GC'd history.
+	if _, err := gitRepo.GetCommit(commitID); err != nil {
+		if !git.IsErrNotExist(err) {
+			log.Error("failed to check commit %s in %s: %v", commitID, gitRepo.Path, err)
+		}
+		return false
+	}
+	return true
 }
 
 // APIURL returns the repository API URL

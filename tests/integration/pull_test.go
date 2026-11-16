@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"forgejo.org/models/db"
+	issues_model "forgejo.org/models/issues"
 	repo_model "forgejo.org/models/repo"
 	"forgejo.org/models/unit"
 	"forgejo.org/models/unittest"
 	user_model "forgejo.org/models/user"
+	"forgejo.org/modules/json"
 	"forgejo.org/tests"
 
 	"github.com/stretchr/testify/assert"
@@ -79,6 +81,43 @@ func TestPullViewConversation(t *testing.T) {
 		fifthCommitShaHref, _ := fifthCommit.Find("a.sha.label").Attr("href")
 		assert.Equal(t, "/user2/commitsonpr/commit/3e64625bd6eb5bcba69ac97de6c8f507402df861", fifthCommitMessageHref)
 		assert.Equal(t, "/user2/commitsonpr/commit/3e64625bd6eb5bcba69ac97de6c8f507402df861", fifthCommitShaHref)
+	})
+
+	t.Run("ForcePush", func(t *testing.T) {
+		forcePush := htmlDoc.Find("#issuecomment-17")
+		require.Equal(t, 1, forcePush.Length())
+		assert.Equal(t, 1, forcePush.Find("svg.octicon-repo-push").Length())
+		assert.Equal(t, "user2", forcePush.Find("a.author").Text())
+		assert.Contains(t, forcePush.Text(), "force-pushed branch1 from")
+		assert.Equal(t, "1978192d98", forcePush.Find("a.ui.sha[href='/user2/commitsonpr/commit/1978192d98bb1b65e11c2cf37da854fbf94bffd6'] code").Text())
+		assert.Equal(t, "9b93963cf6", forcePush.Find("a.ui.sha[href='/user2/commitsonpr/commit/9b93963cf6de4dc33f915bb67f192d099c301f43'] code").Text())
+		assert.Equal(t, 1, forcePush.Find("span.compare a[href='/user2/commitsonpr/compare/1978192d98bb1b65e11c2cf37da854fbf94bffd6..9b93963cf6de4dc33f915bb67f192d099c301f43']").Length())
+	})
+
+	t.Run("ForcePush GC'd Commits", func(t *testing.T) {
+		// Change the synthetic fixture comment to refer to a commit that is not in its Git repository.
+		comment := unittest.AssertExistsAndLoadBean(t, &issues_model.Comment{ID: 17})
+		var content issues_model.PushActionContent
+		require.NoError(t, json.Unmarshal([]byte(comment.Content), &content))
+		require.True(t, content.IsForcePush)
+		require.Len(t, content.CommitIDs, 2)
+		content.CommitIDs[0] = "0123456789012345678901234567890123456789"
+		updatedContent, err := json.Marshal(content)
+		require.NoError(t, err)
+		comment.Content = string(updatedContent)
+		_, err = db.GetEngine(t.Context()).ID(comment.ID).Cols("content").Update(comment)
+		require.NoError(t, err)
+
+		resp := MakeRequest(t, NewRequest(t, "GET", "/user2/commitsonpr/pulls/1"), http.StatusOK)
+		gcHTML := NewHTMLParser(t, resp.Body).Find("#issuecomment-17")
+		require.Equal(t, 1, gcHTML.Length())
+		assert.Equal(t, 1, gcHTML.Find("svg.octicon-repo-push").Length())
+		assert.Equal(t, "user2", gcHTML.Find("a.author").Text())
+		assert.Contains(t, gcHTML.Text(), "force-pushed branch1 from")
+		assert.Equal(t, "0123456789", gcHTML.Find("span[data-tooltip-content] code").Text())
+		assert.Contains(t, gcHTML.Find("span[data-tooltip-content]").Text(), "(unavailable)")
+		assert.Equal(t, "9b93963cf6", gcHTML.Find("a.ui.sha[href='/user2/commitsonpr/commit/9b93963cf6de4dc33f915bb67f192d099c301f43'] code").Text())
+		assert.NotContains(t, gcHTML.Text(), "Compare")
 	})
 }
 

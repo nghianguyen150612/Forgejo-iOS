@@ -342,6 +342,7 @@ func TestForgejoDownloadRepo(t *testing.T) {
 	downloader, err := NewGiteaDownloader(t.Context(), giteaClient, server.URL, "Gusted/agit-test")
 	require.NoError(t, err)
 	require.NotNil(t, downloader)
+	assert.True(t, downloader.pagination, "Forgejo prerelease versions must retain current pagination support")
 
 	prs, _, err := downloader.GetPullRequests(1, 50)
 	require.NoError(t, err)
@@ -370,6 +371,11 @@ func TestForgejoDownloadRepo(t *testing.T) {
 			RepoName:  "agit-test",
 			OwnerName: "Gusted",
 		},
+		Reactions: []*base.Reaction{{
+			UserID:   89,
+			UserName: "oliverpool",
+			Content:  "+1",
+		}},
 		PatchURL: server.URL + "/Gusted/agit-test/pulls/1.patch",
 		Flow:     1,
 	}, prs[0])

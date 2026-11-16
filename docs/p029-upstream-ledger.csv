@@ -1,0 +1,26 @@
+upstream_sha,scope,classification,disposition
+f2a37353aa84f67e08cba69e4de468bb9fe2d533,supported v15,IMPLEMENTED / QUALIFIED,"P029 commit 82a9053d persists explicit team units. Go 1.26.11 synthetic SQLite and exact-source hosted SQLite regression pass: explicit Code write/PR read/Issue none persist, no duplicates, permissions hold, repeated creation works, and nil/default callers keep defaults."
+7f7e02bd2d2ba7c7d121edc06d1e321450f7cad0,supported v15,NOT APPLICABLE / CI ONLY,Upstream skips security scans for dependency-unchanged PRs; retain the iOS full security gates.
+71ad73984701aa1a7f4e6748f12a9cf0fa0da6fa,development,TEST FIXTURE ONLY,"Equivalent supported-v15 fixture change is f2a37353; no default-branch behavior was ported."
+4d2648a1baf8d38ec530a330c4fe7e5026bee779,development,TEST FIXTURE ONLY,"Adds organization creation options to development Forgery tests; no production behavior change."
+14d5d663e9e0a62c5e6dec83bf3509be3c18bdaf,development,IMPLEMENTED / EXACT-SOURCE HOST CI PASS,"P029 commit e2823a0776 renders GC'd force-push timeline commits safely; TestPullViewConversation and TestActionsForcePushCommitStatus pass in run 43206198080."
+92d5abd016b692a9ce2b419d4f883934b44d03d8,development,IMPLEMENTED / EXACT-SOURCE HOST CI PASS,"P029 commit 67a54b38 fixes prerelease migration version comparison; TestForgejoDownloadRepo and TestGiteaDownloadRepo pass on Go 1.26.11 in run 43206198080."
+e2bd913f63a93ce0b20bfd311908219cc91c2654,development,ALREADY COVERED IN V15 API,"The older CatFileBatch API preserves its reusable subprocess after ErrNotExist; no compatible code patch is needed."
+1d784a058310210559b909f0dd32d5e1ad2c4b36,development,NOT APPLICABLE TO V15,Affected blob-info method is absent from supported-v15 source.
+7e31e853ed6a024357bd79a82e241fe7b3c82bf4,development,DEFERRED / AUDIT CLEAR,"Non-security Mermaid update; strict npm audit --audit-level=low passes with zero findings at P029 source."
+ebbbf105e389d4a5a5e13612387db7187635b6dd,development,DEFERRED / VERSION-SPECIFIC,"Development rename/copy Git diff pipeline is not compatible with the older supported-v15 pipeline."
+d72fc0095164974d35318ca477927057e6c549d1,development,NOT APPLICABLE / CI ONLY,"Upstream backport action update; retain local pinned workflow behavior."
+4eb55986b05b19afbdcc7dae23f8e9d42d16cb70,development,DEFERRED / LOCALIZATION,"Theme localization enhancement is outside this P029 security/compatibility batch."
+4127e922eb8de73847d063d00beb768e6c014b85,development,DEFERRED / REFACTOR ONLY,No supported-v15 correctness or security defect identified.
+fe88cf2f5c324ba17c0bb5a69924a6a51accb933,development,FEATURE DEFERRED,"LFS bulk delete is a development feature, not a supported-v15 security fix."
+c9611b6ef9d712af688b30eb828bad9a59525a9a,development,FEATURE DEFERRED,LFS image diffs are outside the supported-v15 P029 scope.
+d191d25cb3b5082607780bdff89fc2353a92161b,development,FEATURE DEFERRED,AGit Git-config display is a development UX feature.
+21ec71ef38b32f998386bd8b4865d43befd058b6,development,TEST ONLY / DEFERRED,"Upstream LFS test readability correction; no production behavior change."
+85d181dcf6170f8831f7fffd6835f5352c88b0bc,development,TEST ONLY / DEFERRED,"Upstream Git mirror test retry; no product behavior change."
+6c2b8b9d726a44abbaf7bc07d293cb10e93829a7,development prerequisite,BLOCKED — FORCE-PUSH HISTORY PREREQUISITE,"BLOCKED: reviewed actual v15 services and upstream patches; SQL/ref partial failures and duplicate retries are not recoverable; legacy/new protection and deletion reconciliation absent. Synthetic application baseline confirms existing pins survive while events create no pins, retries duplicate SQL records, and deletion orphans pins. See docs/p029-force-push-compatibility.md. This exclusion is not PASS."
+efa00103570af0d7ad5eea92be9a02fa209459b2,development,BLOCKED — FORCE-PUSH HISTORY PREREQUISITE,"BLOCKED: reviewed actual v15 services and upstream patches; SQL/ref partial failures and duplicate retries are not recoverable; legacy/new protection and deletion reconciliation absent. Synthetic application baseline confirms existing pins survive while events create no pins, retries duplicate SQL records, and deletion orphans pins. See docs/p029-force-push-compatibility.md. This exclusion is not PASS."
+3f67b3a685eb8fe358b5159aaa32b5213b122738,development,NOT APPLICABLE / CI POLICY,Keep current full iOS security jobs enabled.
+6c56e6af7a3cb21648c56f05dc6af7f70f6f94a6,development,NOT APPLICABLE / TOOLCHAIN,Keep supported-v15 Go 1.26.11 and required A7 patches; do not adopt Go 1.27.4.
+008a2846d36dcdf79404c49e36b1a9e1cb7676c3,development,ALREADY PORTED,P027 a434f9cf adds the built-in fj OAuth application.
+c7a1d39fda57f71198633a0e1e3e6a5e58744160,development,ALREADY PORTED,P027 a7882540 uses the cfo archive mirror and preserves the A7 pin.
+64a8d3c22a83c3b5bd0439a29ca9468abbb6d741,development,ALREADY PORTED,P027 f3df7348 removes the deprecated HTTP update-checker endpoint.
