@@ -1,4 +1,4 @@
-# P029: PARTIAL — RESUMABLE
+# P029: HOST/NATIVE QUALIFIED WITHIN IMPLEMENTED SCOPE
 
 ## Branch and source
 
@@ -92,3 +92,31 @@ Next exact action: inspect the four run IDs above, record terminal outcomes and 
 - Final branch may contain documentation/evidence-only commits after tested checkpoint `67e337fc5f07b4857bafd4d7fffa73ca840474e8`; compare the final HEAD with that checkpoint before resuming. Application implementation remains exactly as qualified at `67a54b38`.
 
 **P029: PARTIAL — RESUMABLE.** Next exact action: inspect `43352182584`, `43352185643`, `43352189209` (and their job annotations if acquisition fails), then record terminal outcomes and new A7/security artifacts. Keep the mirror port excluded until durable SQL/Git reconciliation, dual-layout protection and safe cleanup are implemented and application-tested. Production modifications **NONE**; device validation **DEFERRED — OWNER APPROVED**.
+
+
+## 2026-11-16 terminal evidence reconciliation (authoritative)
+
+Verified origin P029 HEAD `c5d065cf7e0f2bce457f0986ee40c2d49a886a75` and existing Draft PR before editing. Qualified checkpoint `67e337fc5f07b4857bafd4d7fffa73ca840474e8` differs from that HEAD only in documentation/evidence. All earlier queued/pending recovery statuses are superseded by this terminal record.
+
+- **PASS** — run [43352182584](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/43352182584), attempt 1, completed/success on `67e337fc5f07b4857bafd4d7fffa73ca840474e8`.
+  - frontend: **PASS**, job `131645636374`.
+  - vulnerabilities: **PASS**, job `131645636760`.
+  - security: **PASS**, job `131645636804`.
+  - Artifact `p028-vulnerability-evidence`, ID `14006405605`, archive `sha256:a70bbf5b17e580b7becd7391d9a7bbc24bce8d01331da365515aaed5517e7056`; expired=false.
+  - Artifact `p028-frontend-audit`, ID `14006240800`, archive `sha256:680d7b0f0044bfa35a8ba5fd1104e956c0b99e3c2c8f2561b8e2ae98af8bdea7`; expired=false.
+- **PASS** — run [43352185643](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/43352185643), attempt 1, completed/success on `67e337fc5f07b4857bafd4d7fffa73ca840474e8`.
+  - forgejo-production: **PASS**, job `131645644229`.
+  - verify-production-artifact: **PASS**, job `131648710336`.
+  - Artifact `ios-forgejo-production`, ID `14005390122`, archive `sha256:273c4eb3b05aa8b05a9ffc33fe86820ac6b01c519690ca6ce6e8096ca610e29a`; expired=false.
+- **PASS** — run [43352192396](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/43352192396), attempt 1, completed/success on `67e337fc5f07b4857bafd4d7fffa73ca840474e8`.
+  - ios-cgo-probe: **PASS**, job `131645667281`.
+  - Artifact `ios-runtime-compatibility-matrix`, ID `14004966701`, archive `sha256:360281449ea1b18c51c74dec68bef7c800cd84fb7c6b543dc84d973b1ae33bcf`; expired=false.
+- **PASS** — run [43352189209](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/43352189209), attempt 1, completed/success on `67e337fc5f07b4857bafd4d7fffa73ca840474e8`.
+  - forgejo-a7-runtime: **PASS**, job `131645658675`.
+  - linux-stock-regression: **PASS**, job `131645659055`.
+  - verify-a7-artifact: **PASS**, job `131652299072`.
+  - Artifact `ios-forgejo-a7-runtime`, ID `14005420549`, archive `sha256:003b5b5e9ed0a7e2f492158efc7b1fd16f692d0eafa66ac43e42f4ac271d0743`; expired=false.
+
+**BLOCKED — force-push reference-history functionality** remains excluded. Successful host/native CI qualifies the existing application and compatibility baseline tests only. See [compatibility decision](p029-force-push-compatibility.md); SQL/Git reconciliation, duplicates, orphan pins, dual namespaces, receive hooks, mirrors and application deletion cleanup remain unresolved. No new evidence changes that decision. Artifact digests above are GitHub archive metadata; independent hosted consumers passed on the exact checkpoint.
+
+P029 is **host/native qualified within its implemented scope**. This is not production-release readiness. Physical-device validation: **DEFERRED — OWNER APPROVED**; device tests **NOT RUN**. Production modifications **NONE**; release jobs skipped/no publication; no existing Draft PR merged. P030 must obtain fresh qualification for every changed source checkpoint.
