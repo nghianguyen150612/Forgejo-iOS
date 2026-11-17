@@ -33,12 +33,13 @@ jobs:
       TEST_PGSQL_SCHEMA: ''
       TEST_TYPE: integration
       TEST_STORAGE_TYPE: local
-      REPO_TEST_DIR: ${{ runner.temp }}/
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Configure isolated integration fixture directory
+        run: echo "REPO_TEST_DIR=${RUNNER_TEMP}/" >> "${GITHUB_ENV}"
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v5
         with:
           go-version-file: go.mod
