@@ -192,3 +192,19 @@ func TestCommentListLoadReactions(t *testing.T) {
 	assert.Equal(t, "rocket", comment2.Reactions[0].Type)
 	assert.NotNil(t, comment2.Reactions[0].User)
 }
+
+func TestCommentListLoadLabels(t *testing.T) {
+	require.NoError(t, unittest.PrepareTestDatabase())
+
+	// These comments have IDs unrelated to their label IDs, and distinct labels,
+	// so indexing the batch result by comment ID cannot pass accidentally.
+	comment1 := unittest.AssertExistsAndLoadBean(t, &Comment{ID: 2020, LabelID: 1})
+	comment2 := unittest.AssertExistsAndLoadBean(t, &Comment{ID: 2021, LabelID: 2})
+
+	require.NoError(t, CommentList{comment1, comment2}.loadLabels(db.DefaultContext))
+
+	require.NotNil(t, comment1.Label)
+	assert.EqualValues(t, 1, comment1.Label.ID)
+	require.NotNil(t, comment2.Label)
+	assert.EqualValues(t, 2, comment2.Label.ID)
+}

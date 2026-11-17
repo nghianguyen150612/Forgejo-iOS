@@ -51,7 +51,7 @@ jobs:
       - name: Build Forgejo integration executable
         run: make backend TAGS='sqlite sqlite_unlock_notify'
       - name: Run application authentication, repository and release queries on PostgreSQL
-        run: make test-pgsql GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(P030OrganisationVisibility|APIReleaseList|APIOrgRepos|APIUserReposNotLogin|CombinedStatusReturnsPendingWhenCommitHasNoStatuses|CombinedStatusKeepsEmptyObjectWhenPageExceedsResults|PackageNpm|PackageDebian)'"
+        run: make test-pgsql GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(P030OrganisationVisibility|P030CommentListLoadsLabels|APIReleaseList|APIOrgRepos|APIUserReposNotLogin|CombinedStatusReturnsPendingWhenCommitHasNoStatuses|CombinedStatusKeepsEmptyObjectWhenPageExceedsResults|PackageNpm|PackageDebian)'"
 
   security:
     runs-on: ubuntu-latest
