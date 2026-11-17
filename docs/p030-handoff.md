@@ -92,7 +92,7 @@ The force-push history prerequisite and mirror changes `6c2b8b9d726a44abbaf7bc07
 
 Draft PR [#13](https://github.com/nghianguyen150612/Forgejo-iOS/pull/13) remains open and targets `ios/p029-upstream-integration`. Production `iOS` remains `dfb0b0664f1245f7436a306baf711540f712a03f`; no tag, release, merge, production data access, scheduled watcher change, or deployment occurred. Physical-device testing is **DEFERRED — OWNER APPROVED**.
 
-**P030: PARTIAL — RESUMABLE.** Next exact action: capture terminal results and independent artifact provenance for the `bea72ec25fcf14dabe42665a45108d4bdd5e50c6` runs below; after exact-source qualification, review development localization commits `7fb822065758cb34c624be56125610d61c639881` and `a633cdb941ebc38b42dbe97a469342f8d3a77df3` against v15 catalogs. Keep the force-push history work BLOCKED and excluded.
+**P030: PARTIAL — RESUMABLE.** Next exact action: capture terminal results and independent artifact provenance for the `bea72ec25fcf14dabe42665a45108d4bdd5e50c6` runs below. Localization commits `7fb822065758cb34c624be56125610d61c639881` and `a633cdb941ebc38b42dbe97a469342f8d3a77df3` were reviewed: they update 40 catalogs (19 legacy INI and 21 locale_next JSON), with no security/runtime fix and no mapped supported-v15 key set. Keep them deferred until a key-by-key v15 catalog update can preserve locale completeness. Keep force-push history work BLOCKED and excluded.
 
 ## Exact-source qualification for latest development fix
 
