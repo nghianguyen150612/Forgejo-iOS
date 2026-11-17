@@ -2,7 +2,7 @@
 
 P029 received HEAD `c5d065cf7e0f2bce457f0986ee40c2d49a886a75` was verified before editing. Reconciled P029 HEAD/base `df69dda444b0aa447cb2da15cad90be052cd2026` changes documentation only from that HEAD and exact test/workflow checkpoint `67e337fc5f07b4857bafd4d7fffa73ca840474e8`. All four terminal runs PASS, including independent consumers; exact IDs and artifact hashes are in `p029-handoff.md` and `evidence/p029-terminal-ci.json`. P029 is host/native qualified within implemented scope, with force-push history explicitly excluded and BLOCKED.
 
-P030 branch `ios/p030-upstream-integration` targets `ios/p029-upstream-integration`. Latest refreshed official Codeberg refs: supported `v15.0/forgejo` `32db264fb3127358eb4d57ba34f506cca60dc9b8`; development `forgejo` `85e949fd5c1118600d753b6efa5809115b5f6828`. Compared with actual P029 review baselines `7f7e02bd2d2ba7c7d121edc06d1e321450f7cad0` and `4d2648a1baf8d38ec530a330c4fe7e5026bee779`. The supported-v15 interval contains only the organization fixture options change, already implemented in the initial P030 batch. The development interval and all dispositions are in `p030-upstream-ledger.csv`; no development branch merge was performed.
+P030 branch `ios/p030-upstream-integration` targets `ios/p029-upstream-integration`. Latest refreshed official Codeberg refs: supported `v15.0/forgejo` `32db264fb3127358eb4d57ba34f506cca60dc9b8`; development `forgejo` `a91a55edc7e69afa4fbdf174364bb92aa36d51c2`. Compared with actual P029 review baselines `7f7e02bd2d2ba7c7d121edc06d1e321450f7cad0` and `4d2648a1baf8d38ec530a330c4fe7e5026bee779`. The supported-v15 interval contains only the organization fixture options change, already implemented in the initial P030 batch. Development gained one additional label-event loading fix after the earlier `85e949...` snapshot; it is ported below. The development interval and all dispositions are in `p030-upstream-ledger.csv`; no development branch merge was performed.
 
 ## First implemented batch
 
@@ -12,6 +12,12 @@ P030 branch `ios/p030-upstream-integration` targets `ios/p029-upstream-integrati
 - Existing host workflow additionally selects all release API tests and the new visibility test; no security gate weakened. Go 1.26.11, A7 runtime, security dependencies, strict npm audit low threshold, iOS launcher/packaging/deployment target and synthetic fixtures retained.
 
 No new supported-v15 security patch exists in the refreshed interval. The development pgx update was reviewed and adopted after isolated PostgreSQL qualification; its fresh hosted vulnerability result remains pending.
+
+## Latest development fix ported to the v15 model layer
+
+Upstream `a91a55edc7e69afa4fbdf174364bb92aa36d51c2` fixes issue label-event batch loading: the batch map had been indexed by comment ID instead of label ID, and later per-event loaders repeated queries for values that were already loaded. The same code path exists in supported v15, so P030 applies the local correction without merging development: index by `LabelID`, and make label/milestone loaders reuse populated fields. No schema, authentication, protocol or dependency changes.
+
+Source commit `bea72ec25fcf14dabe42665a45108d4bdd5e50c6` adds the model regression `TestCommentListLoadLabels`, application regression `TestP030CommentListLoadsLabels`, and includes that application case in the synthetic PostgreSQL host lane. Exact local PASS: the complete `models/issues` package suite, target label test, package vet, `go mod verify`, and `go mod tidy -diff` using Go 1.26.11; `make test-pgsql` against a loopback-only synthetic PostgreSQL 16 service ran `TestP030CommentListLoadsLabels` and passed. The local service was stopped after the run.
 
 ## Qualification and excluded work
 
@@ -86,6 +92,19 @@ The force-push history prerequisite and mirror changes `6c2b8b9d726a44abbaf7bc07
 
 Draft PR [#13](https://github.com/nghianguyen150612/Forgejo-iOS/pull/13) remains open and targets `ios/p029-upstream-integration`. Production `iOS` remains `dfb0b0664f1245f7436a306baf711540f712a03f`; no tag, release, merge, production data access, scheduled watcher change, or deployment occurred. Physical-device testing is **DEFERRED — OWNER APPROVED**.
 
-**P030: PARTIAL — RESUMABLE.** Next exact action: compare development localization commits `7fb822065758cb34c624be56125610d61c639881` and `a633cdb941ebc38b42dbe97a469342f8d3a77df3` against the supported-v15 catalogs, then port compatible strings with locale/build verification. Keep the force-push history work BLOCKED and excluded.
+**P030: PARTIAL — RESUMABLE.** Next exact action: capture terminal results and independent artifact provenance for the `bea72ec25fcf14dabe42665a45108d4bdd5e50c6` runs below; after exact-source qualification, review development localization commits `7fb822065758cb34c624be56125610d61c639881` and `a633cdb941ebc38b42dbe97a469342f8d3a77df3` against v15 catalogs. Keep the force-push history work BLOCKED and excluded.
+
+## Exact-source qualification for latest development fix
+
+The new application source checkpoint is `bea72ec25fcf14dabe42665a45108d4bdd5e50c6`, based on and pushed after verified branch HEAD `b451a8154c2ac7b164a73c07deb57c52ce04e2bc`. It includes only the `a91a55ed...` label/milestone loading correction, deterministic SQLite/PostgreSQL regression coverage, and the host workflow selector needed to run the new PostgreSQL case. Earlier successful P030 runs on `e1de7293...` do not qualify this source.
+
+- **PASS — local Go 1.26.11:** target and full `models/issues` tests with `sqlite sqlite_unlock_notify`; package vet; `go mod verify`; `go mod tidy -diff`.
+- **PASS — synthetic PostgreSQL 16:** `make test-pgsql GOTESTCOMPILEDRUNSUFFIX="-test.run=TestP030CommentListLoadsLabels"` against `127.0.0.1:5432`, loopback only; test passed. Service stopped after completion.
+- **QUEUED — exact-source hosted host/security:** run `44016164369` on `bea72ec25fcf14dabe42665a45108d4bdd5e50c6`; includes the new synthetic PostgreSQL integration test, SQLite suite, full vet/module checks, vulnerability coverage and strict npm audit.
+- **QUEUED — exact-source native production:** run `44016164462`.
+- **QUEUED — exact-source A7 runtime and stock regressions:** run `44016164337`.
+- **QUEUED — exact-source runtime matrix:** run `44016164364`.
+
+All newly dispatched workflows use exact source `bea72ec25fcf14dabe42665a45108d4bdd5e50c6`; no result from the earlier `e1de7293...` checkpoint is reused. The new source commit and tests are pushed normally to the existing Draft PR branch.
 
 Production modifications **NONE**; physical-device validation **DEFERRED — OWNER APPROVED**; no production Git/SQL access, release, stable tag, merge or watcher operation. This is not production-release readiness.
