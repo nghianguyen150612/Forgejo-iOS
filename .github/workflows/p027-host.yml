@@ -76,7 +76,7 @@ jobs:
           go mod verify
           go vet -p 2 ./...
       - name: Unit and SQLite fixture checks
-        run: go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./modules/updatechecker ./routers/api/packages/nuget ./services/auth ./services/authz ./services/user ./models/perm/access ./services/issue ./services/actions ./services/repository
+        run: go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./modules/setting ./modules/updatechecker ./routers/api/packages/nuget ./services/auth ./services/authz ./services/user ./models/perm/access ./services/issue ./services/actions ./services/repository
       - name: Build backend required by integration subprocesses
         run: make backend TAGS='sqlite sqlite_unlock_notify'
       - name: API and workflow trust integration checks
