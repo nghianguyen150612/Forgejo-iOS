@@ -108,3 +108,25 @@ The new application source checkpoint is `bea72ec25fcf14dabe42665a45108d4bdd5e50
 All newly dispatched workflows use exact source `bea72ec25fcf14dabe42665a45108d4bdd5e50c6`; no result from the earlier `e1de7293...` checkpoint is reused. Production, A7/stock, runtime matrix, PostgreSQL app tests, frontend, vulnerability scan and host security/SQLite are all PASS. The new source commit and tests are pushed normally to the existing Draft PR branch.
 
 Production modifications **NONE**; physical-device validation **DEFERRED — OWNER APPROVED**; no production Git/SQL access, release, stable tag, merge or watcher operation. This is not production-release readiness.
+
+## November 18 P030 resume
+
+**P030: PARTIAL — RESUMABLE.** Starting branch HEAD `10238f7e6aba2838cc5e0f4d5ada69a8ff52b5c4` matched origin. The clean local checkout and open Draft [PR #13](https://github.com/nghianguyen150612/Forgejo-iOS/pull/13) were verified against P029 base `df69dda444b0aa447cb2da15cad90be052cd2026`. The last fully qualified source remains `bea72ec25fcf14dabe42665a45108d4bdd5e50c6`. The changed source is `700b450635586372e8cd866e32fbac0bf6cbf280`.
+
+| Official Codeberg branch | Fetched HEAD | Commit timestamp |
+| --- | --- | --- |
+| `v15.0/forgejo` | `b6b96a2ca9d401ed52a65de1794dd38c9a043682` | 2026-11-18T01:14:47+01:00 |
+| `forgejo` | `33bcd49a29ac3110a7e119aa64792326b53eb150` | 2026-11-18T03:30:57+01:00 |
+
+The supported-v15 Debian parser backport is **ALREADY PORTED** via `79af66daa72bce27e317bb9d0d3be4f6db022d9c`. The development SSH signing correction `bd750b571e0b1628a711484273e68d4044c50ced` was adapted to preserve explicit v15 INI mappings. With SSH signing enabled, the loader now rejects empty, omitted, default, none, unreadable and malformed public keys. Valid SSH and non-SSH configurations are covered by `TestSSHInstanceKey`. No dependencies changed. Go remains 1.26.11, pgx remains 5.13.0 and the Debian parser remains 0.21.4. No database schema or HTTP protocol changes are required.
+
+The development Project API deletion authorization fix is **NOT APPLICABLE** because the affected API routes and service are absent in v15. The funding lookup optimization is **NOT APPLICABLE** because its service is absent. Release notifications are **DEFERRED** because they add a development migration and API behavior. The 40-file translation batch remains **DEFERRED** pending supported-v15 key mapping.
+
+- **PASS** — local Go 1.26.11 `go test -p 2 -tags='sqlite sqlite_unlock_notify' ./modules/setting` and module verification/tidy. Local full vet was stopped to reclaim workspace disk after the exact-source hosted vet passed.
+- **PASS** — hosted full vet, SQLite, repository/authorization and Actions trust job `134533503978`, full Go module/package/symbol vulnerability job `134533503686`, and synthetic PostgreSQL job `134533504098` in run [44224279589](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/44224279589). Go evidence artifact `14391877036`, archive SHA-256 `82a02130a1706b8952efe8ddcf0a9c1ac12842a5363047f1f1b45ab265b3b3d2`.
+- **PASS** — hosted Vitest and production Webpack. **FAIL** — strict `npm audit --audit-level=low` in the same frontend job `134533504080`. Independently downloaded audit artifact `14392765348` matched SHA-256 `b89ed5c7c532cb6559769a4f5949daac1e3b30ff5179ce6cd7014bb1dc72a31e`. The 32 high-severity package entries trace to one advisory, [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf), affecting all published `picomatch` versions through 4.0.7. The advisory gives no patched version and 4.0.7 is the registry maximum at review time. The lockfile and strict threshold were preserved.
+- **PASS** — native production run [44224283342](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/44224283342), build `134533515117`, independent consumer `134535333557`. Artifact `14391893410`, archive SHA-256 `4d6e0c14358deba3d575682fcfd9ff0b2337e0046e6db4c0ef9383d1b087d16c`.
+- **PASS** — stock/A7 run [44224286798](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/44224286798), stock `134533527433`, A7 `134533527820`, independent consumer `134536198252`. Artifact `14392606948`, archive SHA-256 `850007cd03a473b4c8e784e90761653efcd6359b0c481d772d4b216fb4156008`.
+- **PASS** — runtime matrix [44224290846](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/44224290846), job `134533539073`. Artifact `14391881960`, archive SHA-256 `0787aa8ddb3c446cf287518e4d5281d26518bf2e7de3c5be949b72bac0f3d8f4`.
+
+Full qualification is **BLOCKED** by the JavaScript advisory. Next action is to resolve every affected `picomatch` instance with a published compatible fix, verify the full lockfile with the unchanged strict audit, and rerun host/security/native qualification on the new exact source. Force-push history remains **BLOCKED — DURABLE SQL/GIT RECONCILIATION REQUIRED**. Physical-device qualification remains **DEFERRED — OWNER APPROVED**.
