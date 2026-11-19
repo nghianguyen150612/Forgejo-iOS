@@ -61,7 +61,7 @@ func TestPackageContainer(t *testing.T) {
 		return values
 	}
 
-	images := []string{"test", "te/st", "oras-artifact"}
+	images := []string{"test", "te/st", "oras-artifact", "team__name/nested---repo"}
 	tags := []string{"latest", "main"}
 	multiTag := "multi"
 
@@ -207,6 +207,16 @@ func TestPackageContainer(t *testing.T) {
 			AddTokenAuth(userToken)
 		resp := MakeRequest(t, req, http.StatusOK)
 		assert.Equal(t, "registry/2.0", resp.Header().Get("Docker-Distribution-Api-Version"))
+	})
+
+	t.Run("RejectInvalidImageNames", func(t *testing.T) {
+		defer tests.PrintCurrentTest(t)()
+
+		for _, image := range []string{"a___b", "a..b", "a_-b"} {
+			req := NewRequest(t, "GET", fmt.Sprintf("%sv2/%s/%s/tags/list", setting.AppURL, user.Name, image)).
+				AddTokenAuth(userToken)
+			MakeRequest(t, req, http.StatusBadRequest)
+		}
 	})
 
 	t.Run("ORAS Artifact Upload", func(t *testing.T) {
