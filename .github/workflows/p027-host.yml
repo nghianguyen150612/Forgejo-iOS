@@ -51,7 +51,7 @@ jobs:
       - name: Build Forgejo integration executable
         run: make backend TAGS='sqlite sqlite_unlock_notify'
       - name: Run application authentication, repository and release queries on PostgreSQL
-        run: make test-pgsql GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(P030OrganisationVisibility|P030CommentListLoadsLabels|APIReleaseList|APIOrgRepos|APIUserReposNotLogin|CombinedStatusReturnsPendingWhenCommitHasNoStatuses|CombinedStatusKeepsEmptyObjectWhenPageExceedsResults|PackageNpm|PackageDebian)'"
+        run: make test-pgsql GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(APIActivityFeed|APIUserHeatmap|RepoFindFilesRequiresCodeRead|MakeEmailAddressPrimary|_CmdKeys|P030OrganisationVisibility|P030CommentListLoadsLabels|APIReleaseList|APIOrgRepos|APIUserReposNotLogin|CombinedStatusReturnsPendingWhenCommitHasNoStatuses|CombinedStatusKeepsEmptyObjectWhenPageExceedsResults|PackageNpm|PackageDebian)'"
 
   security:
     runs-on: ubuntu-latest
@@ -76,11 +76,11 @@ jobs:
           go mod verify
           go vet -p 2 ./...
       - name: Unit and SQLite fixture checks
-        run: go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./modules/setting ./modules/updatechecker ./routers/api/packages/nuget ./services/auth ./services/authz ./services/user ./models/perm/access ./services/issue ./services/actions ./services/repository
+        run: go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./models/asymkey ./models/activities ./modules/git ./modules/setting ./modules/updatechecker ./routers/api/packages/nuget ./services/auth ./services/authz ./services/user ./models/perm/access ./services/issue ./services/actions ./services/repository
       - name: Build backend required by integration subprocesses
         run: make backend TAGS='sqlite sqlite_unlock_notify'
       - name: API and workflow trust integration checks
-        run: make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(P030OrganisationVisibility|APIRelease|P029ForcePushCompatibilityBaseline|ForgeryCreateTeamUnitPersistence|PullViewConversation|ActionsForcePushCommitStatus|APIModifyLabels|PackageNuGet|PackageNpm|PackageDebian|CombinedStatusReturnsPendingWhenCommitHasNoStatuses|CombinedStatusKeepsEmptyObjectWhenPageExceedsResults|ActionsForkPullRequest|APIStar|APIWatch|PullAutoMergeFromFork|GitPushConcurrentBranchUpdate|ActionsAPIWorkflowDispatch|APIOrgEdit|ActionsFinishLogs|ActionsDownloadTask)'"
+        run: make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(APIActivityFeed|APIUserHeatmap|RepoFindFilesRequiresCodeRead|MakeEmailAddressPrimary|_CmdKeys|P030OrganisationVisibility|APIRelease|P029ForcePushCompatibilityBaseline|ForgeryCreateTeamUnitPersistence|PullViewConversation|ActionsForcePushCommitStatus|APIModifyLabels|PackageNuGet|PackageNpm|PackageDebian|CombinedStatusReturnsPendingWhenCommitHasNoStatuses|CombinedStatusKeepsEmptyObjectWhenPageExceedsResults|ActionsForkPullRequest|APIStar|APIWatch|PullAutoMergeFromFork|GitPushConcurrentBranchUpdate|ActionsAPIWorkflowDispatch|APIOrgEdit|ActionsFinishLogs|ActionsDownloadTask)'"
 
   vulnerabilities:
     runs-on: ubuntu-latest
