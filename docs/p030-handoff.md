@@ -163,3 +163,55 @@ All four workflows completed **PASS** on exact source `24ade40400676c78ba8514bbf
 - Runtime matrix run `44441725341` passed job `135283933354`. Artifact `14491571459`, archive SHA-256 `a73275611c03925e4fcc039a9ee9aadb5e8a04e6af94a6cd7d12cd6c335e7361`.
 
 Last fully qualified source for implemented P030 scope is now `24ade40400676c78ba8514bbf26393f411e06cfe`. The OCI image-name change and force-push reconciliation remain outstanding. Advisory withdrawal clears the present audit result but does not establish a fix for untrusted repeated-extglob input.
+
+
+## November 19 P030 OCI and security disposition
+
+### Starting state and retained source
+
+At recovery the P030 branch and origin were both `131ebaf12fd3109bdf31fdcf122e4fe63dfb3e17`, with a clean worktree. Previously qualified implementation source was `24ade40400676c78ba8514bbf26393f411e06cfe`. This update adds the OCI implementation at `983eb0c3f6e9c91f0e4c37eacec39ba2369f132e`; documentation changes follow it. Existing Draft PR [#13](https://github.com/nghianguyen150612/Forgejo-iOS/pull/13) remains open against `ios/p029-upstream-integration`.
+
+Official Codeberg refs were refreshed on 2026-11-19: supported `v15.0/forgejo` remains `d44b453ec5dfc194db407bf773cee52e939fecbf` (2026-11-18T20:58:05+01:00); development `forgejo` remains `52e6fd85b02393527e5ee4f1d2e605182e75a379` (2026-11-18T17:43:45+01:00). Development-only changes were not merged wholesale.
+
+### P030-B — supported-v15 OCI name correction
+
+Upstream commit [`0ce19f643b7a1f0dd756cf89c0c67b4aab47cb14`](https://codeberg.org/forgejo/forgejo/commit/0ce19f643b7a1f0dd756cf89c0c67b4aab47cb14), dated 2026-11-18T20:42:32+01:00, corrects OCI image-name validation to allow double underscores and multiple consecutive hyphens. The prior v15 regex incorrectly rejected these valid separators. Source `983eb0c3f6e9c91f0e4c37eacec39ba2369f132e` ports the minimal upstream regex and its OCI-spec comment, preserving v15 routes and stored metadata.
+
+Regression coverage adds valid `team__name/nested---repo` names to the synthetic package registry flow, including upload, existing lookup, manifest/tag/digest retrieval and ownership/auth behavior. Invalid names `a___b`, `a..b` and `a_-b` are rejected with HTTP 400. Existing authorization and no-cross-repository tests remain. Local synthetic SQLite `TestPackageContainer`, focused `routers/api/packages/container` tests, targeted vet, `go mod verify` and `go mod tidy -diff` passed with Go 1.26.11. The OCI-specific end-to-end regression ran against SQLite. The separate hosted PostgreSQL job passed its selected driver/authentication/repository/release cases and compiled the container package/model/service/API layers; it did not select `TestPackageContainer` on PostgreSQL. This correction changes validation only and does not alter a database query or schema. No production repository or database was used.
+
+Exact-source hosted qualification on `983eb0c3f6e9c91f0e4c37eacec39ba2369f132e`:
+
+- **PASS** — host/security run [44486396773](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/44486396773): PostgreSQL job `135430833340`, full Go vulnerability scan `135430833710`, SQLite/security/full vet `135430833733`, frontend/Vitest/Webpack/strict npm audit `135430833790`.
+- **PASS** — production run [44486396180](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/44486396180), build `135430832434`, independent consumer `135432713687`. Artifact `14510873022`, archive SHA-256 `4ed7bf4d8be882f496c2306347bebf18736e1ced428e59b09237a9e5e4954f06`; consumer confirmed source SHA, Go 1.26.11, iOS arm64 Mach-O and archive checksums.
+- **PASS** — A7/stock run [44486396566](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/44486396566), A7 `135430833691`, stock `135430834053`, independent consumer `135433935597`. Artifact `14511131486`, archive SHA-256 `bcabec43931de7003444e263c4c3a4c0a9e2214c0509bc8ff62d6316932cc1bb`; consumer confirmed source, `go1.26.11-a7`, SQLite and Mach-O/checksums.
+- **PASS** — runtime matrix run [44486396390](https://github.com/nghianguyen150612/Forgejo-iOS/actions/runs/44486396390), job `135430833157`; artifact `14509949918`, SHA-256 `9a64e0b18065f2ccdc996edef142ed887998ea499ddb69bb68a029c47b886477`.
+- **PASS** — Go vulnerability artifact `14510961368`, SHA-256 `a9c86aa408f686d1f05390e62e056cbcdf576368729ac3cd98bd8ce02221b641`; frontend audit artifact `14509899989`, SHA-256 `4e044a2f3a275ce705ce6beafa85407a9fba34059777b56f38ff641e617f76d0`.
+
+These hosted results include synthetic PostgreSQL and SQLite/security suites, full Go scan, frontend Vitest/Webpack and strict npm audit. OCI-specific end-to-end registry regressions were exercised locally against synthetic SQLite fixtures.
+
+### P030-A — picomatch disposition
+
+Evidence refreshed at **2026-11-19 08:22 UTC**:
+
+- GitHub marks [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) withdrawn at `2026-11-18T15:38:56Z`; its record retains CVE-2026-112366, High severity, affected versions through 4.0.7 and no first patched version.
+- [OSV](https://osv.dev/vulnerability/GHSA-fc5q-39xc-vjpf) was modified at `2026-11-18T15:56:12Z`, records withdrawal and affected versions from 0 through 4.0.7.
+- [NVD](https://nvd.nist.gov/vuln/detail/CVE-2026-112366) remains “Awaiting Analysis”; last modified `2026-10-19T21:13:39.973Z`.
+- npm registry latest is `4.0.7`, published `2026-08-24T14:36:23.690Z`. Upstream #270 and v2 #246 proposals remain open/unmerged; no official corrected release or maintained drop-in replacement was verified. Withdrawal is not a code fix.
+- An isolated, CPU-limited check of picomatch 2.3.2 and 4.0.4 with `+(*a)` against 28 `a` characters followed by `!` consumed the 2-second CPU limit; each process was terminated with exit -9. This reproduces bounded CPU exhaustion on the installed copies. No unbounded experiment was run.
+
+Forgejo lockfile SHA-256: `package-lock.json` `93fe61d7da9133737e8b3f0985b635789351d0f81c3930fe10f6954ceb123b16`. Locked copies: picomatch 2.3.2 at `node_modules/picomatch`, introduced through fast-glob → micromatch, with additional parent chains through Tailwind/chokidar/anymatch/readdirp and dev @rollup/pluginutils; picomatch 4.0.7 nested under tinyglobby, @stylistic/eslint-plugin, Vite and Vitest. The lock's production markers do not mean these Node processes are deployed: root fast-glob is used by `webpack.config.js` to scan the fixed repository theme path `web_src/css/themes/*.css`; no app source imports picomatch, no built assets contain it, and the shipped server is the Go executable. Node 24 is used by the hosted frontend workflow; package engine floor is Node 20. No public endpoint, plugin input or repository user setting supplying glob patterns was found. A hostile source/configuration change could still consume build-runner CPU.
+
+- **AUDIT STATUS — PASS:** original `npm audit --audit-level=low` and hosted strict audit passed without threshold changes after withdrawal; prior failure remains documented.
+- **PATCH STATUS — NOT PATCHED:** no verified official release or merged source correction; lock versions remain inside the withdrawn range.
+- **RUNTIME EXPOSURE — NOT APPLICABLE:** Node/picomatch is not part of the deployed Go server or generated frontend bundle.
+- **BUILD-TIME EXPOSURE — PRESENT, CONSTRAINED:** repository-controlled fixed globs are used by build tooling; CI is ephemeral, and no untrusted runtime glob input was identified.
+- **RESIDUAL RISK — PRESENT:** bounded test reproduced CPU exhaustion on 2.3.2/4.0.4; latest 4.0.7 has no verified fix.
+- **ACCEPTANCE STATUS — BLOCKED:** no authorized owner acceptance of residual risk is recorded.
+
+Sources: GitHub Advisory API, OSV API, NVD CVE API, npm registry, [picomatch upstream](https://github.com/micromatch/picomatch), [PR #270](https://github.com/micromatch/picomatch/pull/270), [PR #246](https://github.com/micromatch/picomatch/pull/246) and [maintainer explanation on #235](https://github.com/micromatch/picomatch/pull/235). Retrieved 2026-11-19 08:22 UTC.
+
+### Other status
+
+- **BLOCKED — DURABLE SQL/GIT RECONCILIATION REQUIRED:** force-push prerequisite `6c2b8b9d726a44abbaf7bc07d293cb10e93829a7` and mirror fix `efa00103570af0d7ad5eea92be9a02fa209459b2` remain excluded.
+- **DEFERRED — OWNER APPROVED:** physical-device work.
+- **P030: PARTIAL — RESUMABLE.** OCI fix is implemented and exact-source CI passed; no claim of overall release readiness or advisory patch is made.
