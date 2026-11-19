@@ -152,3 +152,14 @@ Official upstream Codeberg became accessible. Refreshed v15 `d44b453ec5dfc194db4
 The supported-v15 OCI container-name fix `0ce19f643b7a1f0dd756cf89c0c67b4aab47cb14` remains **PORT REQUIRED**. The v15 OIDC follow-up `d44b453ec5dfc194db407bf773cee52e939fecbf` is already covered by P030. The force-push history exclusion remains **BLOCKED — DURABLE SQL/GIT RECONCILIATION REQUIRED**.
 
 Exact-source workflows dispatched for `24ade40400676c78ba8514bbf26393f411e06cfe` are host `44441713922`, production `44441717459`, A7/stock `44441721522`, and runtime matrix `44441725341`. Full qualification requires terminal results on these runs. The last fully qualified prior source remains `bea72ec25fcf14dabe42665a45108d4bdd5e50c6`. Physical-device qualification remains **DEFERRED — OWNER APPROVED**.
+
+### Terminal qualification for the v15 security source
+
+All four workflows completed **PASS** on exact source `24ade40400676c78ba8514bbf26393f411e06cfe`.
+
+- Host/security run `44441713922` passed full Go vulnerability job `135283894968`, frontend/Vitest/Webpack and strict npm audit job `135283895165`, SQLite/security integration job `135283895327`, and synthetic PostgreSQL job `135283895466`. Go vulnerability artifact `14491089152`, SHA-256 `31a1cbe274cfe628229303cff527c0c45fc1b04570d066a0be2823c3bb0756c0`. Frontend audit artifact `14490529889`, SHA-256 `866479a48b30ac6dfb20ed64a88cd82f3e570c6c965db0b4a666b44446e59fcf`.
+- Native production run `44441717459` passed build `135283907095` and independent consumer `135286126695`. Artifact `14490959566`, archive SHA-256 `ef3b956bc1f929d246470c1becb15057687080ec41d93d698e3ccee8c4d343b8`.
+- A7 and stock run `44441721522` passed A7 `135283919993`, stock `135283920343` and independent consumer `135286488986`. Artifact `14491039812`, archive SHA-256 `e97d5d4f74c5e4132760901618410f6038ffa7ca7b67091fa613dd0567ed8b29`.
+- Runtime matrix run `44441725341` passed job `135283933354`. Artifact `14491571459`, archive SHA-256 `a73275611c03925e4fcc039a9ee9aadb5e8a04e6af94a6cd7d12cd6c335e7361`.
+
+Last fully qualified source for implemented P030 scope is now `24ade40400676c78ba8514bbf26393f411e06cfe`. The OCI image-name change and force-push reconciliation remain outstanding. Advisory withdrawal clears the present audit result but does not establish a fix for untrusted repeated-extglob input.
