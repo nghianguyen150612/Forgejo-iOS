@@ -37,6 +37,12 @@ func TestAPIReleaseList(t *testing.T) {
 	DecodeJSON(t, resp, &apiReleases)
 	if assert.Len(t, apiReleases, 3) {
 		for _, release := range apiReleases {
+			// The list handler reuses its authorized repository while loading attributes.
+			// All generated URLs must still belong to the requested repository.
+			assert.Contains(t, release.URL, "/api/v1/repos/"+user2.Name+"/"+repo.Name+"/releases/")
+			assert.Contains(t, release.HTMLURL, "/"+user2.Name+"/"+repo.Name+"/releases/")
+			assert.Contains(t, release.TarURL, "/"+user2.Name+"/"+repo.Name+"/archive/")
+			assert.Contains(t, release.ZipURL, "/"+user2.Name+"/"+repo.Name+"/archive/")
 			switch release.ID {
 			case 1:
 				assert.False(t, release.IsDraft)

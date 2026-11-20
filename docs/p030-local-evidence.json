@@ -1,0 +1,75 @@
+{
+  "source_sha": "818531e9441f1687cab442478327e33884ffe8f6",
+  "supported_go": "go1.26.11",
+  "logs": {
+    "forgejo-mod-verify-go12611.log": {
+      "sha256": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd",
+      "bytes": 21
+    },
+    "forgejo-tidy-go12611.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "forgejo-vitest-focused-retry.log": {
+      "sha256": "b991f19ec76b609a0b10887ebd6636b3757d4636fcc49e220aef1114bb4a943e",
+      "bytes": 213
+    },
+    "forgejo-vitest-retry.log": {
+      "sha256": "2d4492200abb0d0bbca0304f73780d467764cede93b3d1b7d6a661803c87378a",
+      "bytes": 220
+    },
+    "forgejo-frontend.log": {
+      "sha256": "4fa91c78432b37425ca85869e7ea701afa5d723307c09f4f4a46f3f03f71e120",
+      "bytes": 731665
+    },
+    "forgejo-npm-audit.json": {
+      "sha256": "c6d08277cef14d01fbe1d839d39652d6769cc3e17536678bbde0e27cddcfcad8",
+      "bytes": 367
+    },
+    "forgejo-unit-go12611.log": {
+      "sha256": "be882146921525934d8d756f938b50eedf651b0c4b1725bbf7378c117fa01b31",
+      "bytes": 80
+    },
+    "forgejo-backend-go12611.log": {
+      "sha256": "447fa1103cb3596421cbc45cc41a73e9c024ee80af3d4b67e60bdfa8d6aca858",
+      "bytes": 34749
+    },
+    "forgejo-integration-go12611-final.log": {
+      "sha256": "3c7a4431e1db6734e2076757b57763bdfe51dbf62f5d273dd39c40798ee4dbc2",
+      "bytes": 11162
+    },
+    "forgejo-query-negative-control.log": {
+      "sha256": "feef6b4498d74cce502df49f7cf63ed96ee4a4bd63ed92ac5928fe9372468198",
+      "bytes": 11529
+    },
+    "forgejo-query-positive-control.log": {
+      "sha256": "64671e3120df8607f6c525dd1df6e7df4a4edac71593c3a95414a2621e0cadeb",
+      "bytes": 9405
+    },
+    "forgejo-migrations-go12611.log": {
+      "sha256": "503aa3dc296d42d16e751ae6f3b17005627c8609ac71f2799df03cc2f53c2ae1",
+      "bytes": 44
+    },
+    "forgejo-vet-go12611.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "frontend_tests": "PASS \u2014 26 files / 103 tests / no unhandled errors",
+  "production_frontend": "PASS",
+  "npm_audit": "PASS \u2014 strict low threshold; zero findings",
+  "module_verify": "PASS",
+  "module_tidy": "PASS \u2014 no diff",
+  "unit_tests": "PASS \u2014 models/repo and routers/api/v1/repo; sqlite sqlite_unlock_notify",
+  "backend": "PASS",
+  "sqlite_integration": "PASS \u2014 full selected suite after query observer repair",
+  "setup_failures": [
+    "Initial Vitest: FAIL with unhandled rejection; automatic unmount repair and full retry PASS",
+    "Incomplete newer-launcher Go runs stopped; not qualification; exact go1.26.11 commands used for recorded results",
+    "New query observer first used session rather than shared engine; second attempt lost XORM tracing context; temporary SQL logger replacement fixes both and full suite passes"
+  ],
+  "physical_device": "DEFERRED \u2014 OWNER APPROVED",
+  "negative_control": "PASS \u2014 removing only repository reuse makes query regression FAIL (2 vs 3 lookups); restored optimization PASS",
+  "migration_regressions": "PASS \u2014 services/migrations TestForgejoDownloadRepo and TestGiteaDownloadRepo; go1.26.11 sqlite sqlite_unlock_notify",
+  "vet": "PASS \u2014 full application, go1.26.11"
+}

@@ -1,6 +1,9 @@
-import {mount, flushPromises} from '@vue/test-utils';
+import {mount, flushPromises, enableAutoUnmount} from '@vue/test-utils';
 import {toAbsoluteUrl} from '../utils.js';
 import RepoActionView from './RepoActionView.vue';
+
+// Polling must not survive a test and run against the next test's reset fetch mock.
+enableAutoUnmount(afterEach);
 
 const testLocale = {
   approve: 'Locale Approve',

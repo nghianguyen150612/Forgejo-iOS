@@ -7,6 +7,52 @@ on:
 permissions:
   contents: read
 jobs:
+  postgres-driver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: forgejo_p030
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -h 127.0.0.1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TZ: UTC
+      GOMAXPROCS: '2'
+      TEST_PGSQL_HOST: 127.0.0.1:5432
+      TEST_PGSQL_DBNAME: forgejo_p030
+      TEST_PGSQL_USERNAME: postgres
+      TEST_PGSQL_PASSWORD: ''
+      TEST_PGSQL_SCHEMA: ''
+      TEST_TYPE: integration
+      TEST_STORAGE_TYPE: local
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Configure isolated integration fixture directory
+        run: echo "REPO_TEST_DIR=${RUNNER_TEMP}/" >> "${GITHUB_ENV}"
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Run isolated PostgreSQL driver lifecycle and security regressions
+        env:
+          P030_POSTGRES_DSN: postgres://postgres@127.0.0.1:5432/postgres?sslmode=disable
+        run: go test -p 2 ./tests/pgxcompat
+      - name: Build Forgejo integration executable
+        run: make backend TAGS='sqlite sqlite_unlock_notify'
+      - name: Run application authentication, repository and release queries on PostgreSQL
+        run: make test-pgsql GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(APIActivityFeed|APIUserHeatmap|RepoFindFilesRequiresCodeRead|MakeEmailAddressPrimary|_CmdKeys|P030OrganisationVisibility|P030CommentListLoadsLabels|APIReleaseList|APIOrgRepos|APIUserReposNotLogin|CombinedStatusReturnsPendingWhenCommitHasNoStatuses|CombinedStatusKeepsEmptyObjectWhenPageExceedsResults|PackageNpm|PackageDebian)'"
+
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -30,11 +76,11 @@ jobs:
           go mod verify
           go vet -p 2 ./...
       - name: Unit and SQLite fixture checks
-        run: go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./modules/updatechecker ./routers/api/packages/nuget ./services/auth ./services/authz ./services/user ./models/perm/access ./services/issue ./services/actions ./services/repository
+        run: go test -p 2 -tags='sqlite sqlite_unlock_notify' ./models/auth ./models/issues ./models/asymkey ./models/activities ./modules/git ./modules/setting ./modules/updatechecker ./routers/api/packages/nuget ./services/auth ./services/authz ./services/user ./models/perm/access ./services/issue ./services/actions ./services/repository
       - name: Build backend required by integration subprocesses
         run: make backend TAGS='sqlite sqlite_unlock_notify'
       - name: API and workflow trust integration checks
-        run: make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(P029ForcePushCompatibilityBaseline|ForgeryCreateTeamUnitPersistence|PullViewConversation|ActionsForcePushCommitStatus|APIModifyLabels|PackageNuGet|ActionsForkPullRequest|APIStar|APIWatch|PullAutoMergeFromFork|GitPushConcurrentBranchUpdate|ActionsAPIWorkflowDispatch|APIOrgEdit|ActionsFinishLogs|ActionsDownloadTask)'"
+        run: make test-sqlite GOTESTCOMPILEDRUNSUFFIX="-test.run='Test(APIActivityFeed|APIUserHeatmap|RepoFindFilesRequiresCodeRead|MakeEmailAddressPrimary|_CmdKeys|P030OrganisationVisibility|APIRelease|P029ForcePushCompatibilityBaseline|ForgeryCreateTeamUnitPersistence|PullViewConversation|ActionsForcePushCommitStatus|APIModifyLabels|PackageNuGet|PackageNpm|PackageDebian|CombinedStatusReturnsPendingWhenCommitHasNoStatuses|CombinedStatusKeepsEmptyObjectWhenPageExceedsResults|ActionsForkPullRequest|APIStar|APIWatch|PullAutoMergeFromFork|GitPushConcurrentBranchUpdate|ActionsAPIWorkflowDispatch|APIOrgEdit|ActionsFinishLogs|ActionsDownloadTask)'"
 
   vulnerabilities:
     runs-on: ubuntu-latest
