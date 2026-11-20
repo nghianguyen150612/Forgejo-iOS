@@ -35,3 +35,4 @@ ab3328848c8b3524c4697e5f7141051b3b9a4bcb,v15.0/forgejo,notification commit statu
 1c3d5cd94bf8c834a1aacd4e6a7b0c779a6c7260,forgejo,notification commit status performance,DEFERRED,Equivalent optional supported-v15 performance change deferred,Development,No new source change
 2964fb620db2f8adb6483051f49dfc118ed8b7cb,forgejo,enable JXL support,DEFERRED,Development-only feature applicability not yet reviewed,Development,No new source change
 12533dd7d0e37b80f6608812f67658f823dcd306,forgejo,release note typo,NOT APPLICABLE,Upstream release notes only,Documentation,No runtime behavior
+GHSA-fc5q-39xc-vjpf,security,picomatch residual build-time risk,OWNER ACCEPTANCE NOT GRANTED,Audit passed after withdrawal; package fix not verified; owner decision pending,Build tooling,Existing strict audit and bounded evidence retained
